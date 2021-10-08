@@ -70,5 +70,11 @@
   },
   "ember-addon": {
     "demoURL": "http://tjvezina.github.io/portfolio-website"
+  },
+  "dependencies": {
+    "ansi-regex": "^5.0.1",
+    "clean-css": "^4.1.11",
+    "glob-parent": "^5.1.2",
+    "set-value": "^4.0.1"
   }
 }
