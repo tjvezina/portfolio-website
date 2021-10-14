@@ -1,3 +1,41 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Why won't importing files work?
+@import 'fonts.css';
+@import 'utilities.css'; */
+
+html * {
+  font-family: 'JetBrainsMono' !important;
+}
+
+/* Utilities */
+
+:root {
+  --foreground-color: #D2D7DB;
+  --light-color: #A69C90;
+  --accent-color: #3AAD3A;
+  --dark-color: #282D3B;
+  --background-color: #221F2B;
+}
+
+@layer utilities {
+  .fg-foreground { color: var(--foreground-color); }
+  .fg-light      { color: var(--light-color);      }
+  .fg-accent     { color: var(--accent-color);     }
+  .fg-dark       { color: var(--dark-color);       }
+  .fg-background { color: var(--background-color); }
+
+  .bg-foreground { background-color: var(--foreground-color); }
+  .bg-light      { background-color: var(--light-color);      }
+  .bg-accent     { background-color: var(--accent-color);     }
+  .bg-dark       { background-color: var(--dark-color);       }
+  .bg-background { background-color: var(--background-color); }
+}
+
+/* Fonts */
+
 @font-face {
   font-family: "JetBrainsMono";
   src: url("fonts/JetBrainsMono-Thin.woff2") format("woff2");
@@ -108,8 +146,4 @@
   src: url("fonts/JetBrainsMono-ExtraBoldItalic.woff2") format("woff2");
   font-weight: 800;
   font-style: italic;
-}
-
-html * {
-  font-family: 'JetBrainsMono' !important;
 }

@@ -2,12 +2,17 @@
 
 const EmberApp = require('ember-cli/lib/broccoli/ember-app');
 
-const nodeSass = require('node-sass');
-
 module.exports = function (defaults) {
   let app = new EmberApp(defaults, {
-    sassOptions: {
-      implementation: nodeSass,
+    minifyCSS: {
+      options: {
+        processImport: true,
+      },
+    },
+    postcssOptions: {
+      compile: {
+        plugins: [require('tailwindcss')],
+      },
     },
   });
 
