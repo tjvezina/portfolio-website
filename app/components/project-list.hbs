@@ -1,0 +1,9 @@
+<div class='m-4 text-3xl text-center font-semibold fg-foreground'>{{@title}}</div>
+<div class='flex flex-row flex-wrap justify-center content-start'>
+  {{#each @projects as |project|}}
+    <ProjectTile
+      @imagePath='assets/images/projects/{{project.path}}/tile.jpg'
+      @title='{{project.title}}'
+    />
+  {{/each}}
+</div>

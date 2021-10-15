@@ -1,0 +1,23 @@
+<div class='px-4 pt-8 pb-16 md:px-12 md:pt-20 md:pb-40 flex flex-col items-center'>
+
+  {{! Introduction }}
+  <div class='flex flex-col md:flex-row items-center'>
+    <div class='mb-8 md:mb-0 md:mr-12 lg:mr-20 flex flex-col items-center'>
+      <div class='mb-12 text-xl text-center font-semibold fg-light'>Hello! My name is</div>
+      <div class='text-4xl text-center font-extrabold fg-accent'>Tyler J Vezina</div>
+      <div class='mt-2 text-3xl text-center font-semibold fg-foreground'>Game Developer</div>
+      <div class='mt-12 text-xl text-center font-semibold fg-light'>Welcome to my portfolio!</div>
+    </div>
+    <img src='assets/images/portrait.jpg' alt='Tyler J Vezina' class='w-72 h-72 my-4 border-8 b-dark bg-dark rounded-full' />
+  </div>
+  {{!-- <div class='my-8 text-sm text-center fg-light'>
+    Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+  </div> --}}
+
+  {{! Projects }}
+  {{#each @model as |project-list index|}}
+    <div class='{{if (gt index 0) 'mt-8'}} md:mt-16' />
+    <ProjectList @title={{project-list.title}} @projects={{project-list.projects}} />
+  {{/each}}
+  
+</div>
