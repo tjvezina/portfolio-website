@@ -32,6 +32,28 @@ html * {
   .bg-accent     { background-color: var(--accent-color);     }
   .bg-dark       { background-color: var(--dark-color);       }
   .bg-background { background-color: var(--background-color); }
+
+  .hover\:bg-foreground:hover { background-color: var(--foreground-color); }
+  .hover\:bg-light:hover      { background-color: var(--light-color);      }
+  .hover\:bg-accent:hover     { background-color: var(--accent-color);     }
+  .hover\:bg-dark:hover       { background-color: var(--dark-color);       }
+  .hover\:bg-background:hover { background-color: var(--background-color); }
+
+  .b-foreground { border-color: var(--foreground-color); }
+  .b-light      { border-color: var(--light-color);      }
+  .b-accent     { border-color: var(--accent-color);     }
+  .b-dark       { border-color: var(--dark-color);       }
+  .b-background { border-color: var(--background-color); }
+
+  .hover\:b-foreground:hover { border-color: var(--foreground-color); }
+  .hover\:b-light:hover      { border-color: var(--light-color);      }
+  .hover\:b-accent:hover     { border-color: var(--accent-color);     }
+  .hover\:b-dark:hover       { border-color: var(--dark-color);       }
+  .hover\:b-background:hover { border-color: var(--background-color); }
+
+  .page-background {
+    background-image: url('images/background.png');
+  }
 }
 
 /* Fonts */

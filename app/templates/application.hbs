@@ -1,9 +1,37 @@
-<div class='w-screen h-screen flex bg-background'>
+<div class='w-screen h-screen flex bg-background page-background'>
   <div class='flex flex-row'>
-    <div class='w-96 p-8 bg-dark flex flex-col items-center'>
-      <h2 class='text-4xl font-extrabold fg-accent'>Tyler J Vezina</h2>
-      <h3 class='mt-2 text-3xl font-semibold fg-light'>Game Developer</h3>
-      <div class='w-72 h-72 my-4 bg-foreground'></div>
+    {{! Sidebar }}
+    <div class='w-96 p-8 flex flex-col items-center'>
+      <div class='text-4xl font-extrabold fg-accent'>
+        Tyler J Vezina
+      </div>
+      <div class='mt-2 text-3xl font-semibold fg-foreground'>
+        Game Developer
+      </div>
+      <img src='assets/images/portrait.jpg' alt='Tyler J Vezina' class='w-72 h-72 my-4 border-4 b-light bg-dark rounded-lg' />
+      <div class='mt-2 text-sm fg-light'>
+        Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+      </div>
+    </div>
+    {{! Body }}
+    <div class='flex-1 px-20 pt-20 pb-40 flex flex-col items-center overflow-y-scroll'>
+      <div class='m-4 text-3xl font-semibold fg-foreground'>Professional Projects</div>
+      <div class='flex flex-row flex-wrap justify-center content-start'>
+        {{#each (array 0 1 2 3 4) as | entry |}}
+          <div class='w-72 h-72 m-4 flex border-12 rounded-lg b-dark hover:b-accent transition transform hover:scale-110'>
+            <img src='assets/images/placeholder.png' alt='placeholder' />
+          </div>
+        {{/each}}
+      </div>
+      <div class='mt-16' />
+      <div class='m-4 text-3xl font-semibold fg-foreground'>Personal Projects</div>
+      <div class='flex flex-row flex-wrap justify-center content-start'>
+        {{#each (array 0 1 2 3 4 5 6) as | entry |}}
+          <div class='w-72 h-72 m-4 flex border-12 b-dark hover:b-accent transition transform hover:scale-110'>
+            <img src='assets/images/placeholder.png' alt='placeholder' />
+          </div>
+        {{/each}}
+      </div>
     </div>
   </div>
 </div>
