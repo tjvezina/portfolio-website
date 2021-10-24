@@ -6,8 +6,25 @@
 @import 'fonts.css';
 @import 'utilities.css'; */
 
-html * {
+html, body {
+  margin: 0;
+  height: 100%;
+}
+
+#c {
+  position: fixed;
+  width: 100% !important;
+  height: 100% !important;
+  left: 0;
+  top: 0;
+  border: none;
+  /* display: block; */
+}
+
+* {
   font-family: 'JetBrainsMono' !important;
+  color: var(--foreground-color);
+  background-color: var(--background-color);
 }
 
 *:hover > .parent-hover-opacity-100 { opacity: 1; }
