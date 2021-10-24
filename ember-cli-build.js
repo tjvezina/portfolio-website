@@ -14,6 +14,9 @@ module.exports = function (defaults) {
         plugins: [require('tailwindcss')],
       },
     },
+    fingerprint: {
+      exclude: ['assets/images/projects/'],
+    },
   });
 
   // Use `app.import` to add additional libraries to the generated
