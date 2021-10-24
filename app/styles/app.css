@@ -18,13 +18,15 @@ html, body {
   left: 0;
   top: 0;
   border: none;
-  /* display: block; */
+  z-index: -1;
 }
 
 * {
   font-family: 'JetBrainsMono' !important;
+}
+
+body {
   color: var(--foreground-color);
-  background-color: var(--background-color);
 }
 
 *:hover > .parent-hover-opacity-100 { opacity: 1; }

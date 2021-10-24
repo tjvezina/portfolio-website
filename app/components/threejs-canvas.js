@@ -2,13 +2,17 @@ import Component from '@glimmer/component';
 import { action } from '@ember/object';
 import THREE from 'three';
 
+const H_FOV = 90;
+
 export default class ThreejsCanvasComponent extends Component {
   @action initialize() {
-    const canvas = document.querySelector('#c');
+    this.canvas = document.querySelector('#c');
+
+    const { canvas } = this;
     const { clientWidth, clientHeight } = canvas;
 
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(75, clientWidth / clientHeight, 0.1, 1000);
+    const camera = new THREE.PerspectiveCamera(this.horizontalToVerticalFOV(H_FOV), clientWidth / clientHeight, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     renderer.setSize(clientWidth, clientHeight);
 
@@ -19,20 +23,22 @@ export default class ThreejsCanvasComponent extends Component {
 
     camera.position.z = 5;
 
-    Object.assign(this, { canvas, scene, camera, renderer, cube});
+    Object.assign(this, { scene, camera, renderer, cube});
 
-    this.draw();
+    requestAnimationFrame(this.draw.bind(this));
   }
 
-  draw() {
+  draw(time) {
     requestAnimationFrame(this.draw.bind(this));
+    time /= 1000; // Convert to seconds
 
     const { canvas, renderer, scene, camera, cube } = this;
-    const { clientWidth: parentWidth, clientHeight: parentHeight } = canvas.parentNode;
+    const { clientWidth, clientHeight } = canvas;
 
-    if (canvas.width !== parentWidth || canvas.height !== parentHeight) {
-      renderer.setSize(parentWidth, parentHeight, false);
-      camera.aspect = parentWidth / parentHeight;
+    if (canvas.width !== clientWidth || canvas.height !== clientHeight) {
+      renderer.setSize(clientWidth, clientHeight, false);
+      camera.aspect = clientWidth / clientHeight;
+      camera.fov = this.horizontalToVerticalFOV(H_FOV);
       camera.updateProjectionMatrix();
     }
 
@@ -40,5 +46,10 @@ export default class ThreejsCanvasComponent extends Component {
     cube.rotation.y += 0.01;
 
     renderer.render(scene, camera);
+  }
+
+  horizontalToVerticalFOV(fov) {
+    const { clientWidth, clientHeight } = this.canvas;
+    return 2 * Math.atan(Math.tan(fov/2 * THREE.MathUtils.DEG2RAD) * clientHeight / clientWidth) * THREE.MathUtils.RAD2DEG;
   }
 }
