@@ -27,6 +27,7 @@ html, body {
 
 body {
   color: var(--foreground-color);
+  background-color: #000;
 }
 
 *:hover > .parent-hover-opacity-100 { opacity: 1; }
