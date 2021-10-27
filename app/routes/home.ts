@@ -1,7 +1,17 @@
 import Route from '@ember/routing/route';
 
+interface Project {
+  title: string;
+  path: string;
+}
+
+interface ProjectGroup {
+  title: string;
+  projects: Project[];
+}
+
 export default class HomeRoute extends Route {
-  model() {
+  model(): ProjectGroup[] {
     return [
       {
         title: 'Professional Projects',
