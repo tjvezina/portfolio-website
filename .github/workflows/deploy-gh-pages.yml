@@ -9,23 +9,22 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v3
 
-    - name: Install dependencies
-      uses: borales/actions-yarn@v3.0.0
+    - name: Set up Node (and yarn)
+      uses: actions/setup-node@v3
       with:
-        cmd: install
+        node-version: '16.x'
+        cache: 'yarn'
+
+    - name: Install dependencies
+      run: yarn install --frozen-lockfile
 
     - name: Build
-      uses: borales/actions-yarn@v3.0.0
-      with:
-        cmd: build
+      run: yarn build
 
-    # This step is necessary for gh-pages to know what remote to push to, and have the authority to do so
-    - name: Set repo URL
-      run: git remote set-url origin https://git:${GITHUB_TOKEN}@github.com/tjvezina/portfolio-website.git
+    - name: Deploy
+      run: |
+        git remote set-url origin https://git:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git
+        git remote -v
+        yarn gh-pages -d dist -u "github-actions-bot <support+actions@github.com>"
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    
-    - name: Deploy to GH Pages
-      uses: borales/actions-yarn@v3.0.0
-      with:
-        cmd: gh-pages -d dist -u "github-actions-bot <support+actions@github.com>"
