@@ -13,10 +13,14 @@ jobs:
       uses: borales/actions-yarn@v3.0.0
       with:
         cmd: install
+
+    # This step is necessary for gh-pages to know what remote to push to, and have the authority to do so
+    - name: Set repo URL
+      run: git remote set-url origin https://git:${GITHUB_TOKEN}@github.com/tjvezina/portfolio-website.git
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     
     - name: Deploy to GH Pages
       uses: borales/actions-yarn@v3.0.0
       with:
-        cmd: deploy
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        cmd: gh-pages -d dist -u "github-actions-bot <support+actions@github.com>"
