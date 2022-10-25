@@ -70,10 +70,15 @@ export default class ShatterIcosa extends Object3D {
   }
 
   update(): void {
+    const t = Math.max(0, -Math.cos(App.clock.elapsedTime));
+
     this.children.forEach(shard => {
-      shard.children[0].position.copy(
-        this.shardNormal.clone().multiplyScalar(Math.max(0, -Math.sin(App.clock.elapsedTime))),
+      const mesh = shard.children[0];
+      mesh.position.copy(
+        this.shardNormal.clone().multiplyScalar(t),
       );
+      mesh.rotation.set(0, 0, 0);
+      mesh.rotateOnAxis(this.shardNormal, Math.PI/3 * (-Math.cos(t * Math.PI) /2 + 0.5));
     });
   }
 }
