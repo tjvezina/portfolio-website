@@ -1,4 +1,4 @@
-import { BloomEffect, EffectComposer, EffectPass, RenderPass } from 'postprocessing';
+import { EffectComposer, EffectPass, RenderPass } from 'postprocessing';
 import {
   Clock,
   PerspectiveCamera,
@@ -22,6 +22,8 @@ export default class App {
 
   static get width(): number { return window.innerWidth; }
   static get height(): number { return window.innerHeight; }
+
+  static addEffectPass(effectPass: EffectPass): void { App.#instance.addEffectPass(effectPass); }
 
   static init(): void {
     new App(); // eslint-disable-line no-new
@@ -52,22 +54,17 @@ export default class App {
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
 
     this.effectComposer = new EffectComposer(this.renderer);
-
-    const bloomEffect = new BloomEffect({
-      mipmapBlur: true,
-      luminanceThreshold: 0,
-      intensity: 5,
-    });
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore : Type definitions are incomplete
-    bloomEffect.mipmapBlurPass.radius = 2/3;
-
     this.effectComposer.addPass(new RenderPass(this.scene, this.camera));
-    this.effectComposer.addPass(new EffectPass(this.camera, bloomEffect));
 
     window.addEventListener('resize', this.onWindowResized.bind(this), false);
 
+    this.scene.init();
     this.draw();
+  }
+
+  addEffectPass(effectPass: EffectPass): void {
+    console.log(this);
+    this.effectComposer.addPass(effectPass);
   }
 
   onWindowResized(): void {
