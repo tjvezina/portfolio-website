@@ -12,4 +12,3 @@ See the current build at https://tjvezina.github.io/portfolio-website/
   - Build, then serve on `http://localhost:8080/`, hot reloading when files change
 - `yarn deploy`
   - Build, then copy the contents of `./dist/` to the `gh-pages` branch and push (this updates the GitHub Pages site)
-  - *Note: `gh-pages` CLI would only work when the remote is called "origin" and uses the HTTPS URL.*
