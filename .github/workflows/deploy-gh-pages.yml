@@ -18,3 +18,5 @@ jobs:
       uses: borales/actions-yarn@v3.0.0
       with:
         cmd: deploy
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
