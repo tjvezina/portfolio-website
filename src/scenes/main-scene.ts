@@ -9,6 +9,8 @@ export default class MainScene extends Scene {
     super();
 
     this.icosa = new ShatterIcosa();
+    this.icosa.rotation.x = Math.PI/2;
+    this.icosa.rotation.y = Math.PI;
     this.add(this.icosa);
   }
 

@@ -72,7 +72,7 @@ export default class ShatterIcosa extends Object3D {
   update(): void {
     this.children.forEach(shard => {
       shard.children[0].position.copy(
-        this.shardNormal.clone().multiplyScalar(Math.max(0, Math.sin(App.clock.elapsedTime))),
+        this.shardNormal.clone().multiplyScalar(Math.max(0, -Math.sin(App.clock.elapsedTime))),
       );
     });
   }

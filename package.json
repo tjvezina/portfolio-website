@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "build": "webpack",
-    "start": "webpack serve"
+    "serve": "yarn build && webpack serve",
+    "deploy": "yarn build && gh-pages -d dist -b gh-pages"
   },
   "dependencies": {
     "postprocessing": "^6.29.0",
@@ -23,6 +24,7 @@
     "eslint-plugin-promise": "^6.1.1",
     "eslint-plugin-simple-import-sort": "^8.0.0",
     "eslint-plugin-standard": "^5.0.0",
+    "gh-pages": "^4.0.0",
     "html-webpack-plugin": "^5.5.0",
     "ts-loader": "^9.4.1",
     "tsconfig-paths-webpack-plugin": "^4.0.0",
