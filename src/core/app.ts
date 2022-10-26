@@ -4,7 +4,7 @@ import {
   PerspectiveCamera,
   WebGLRenderer,
 } from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 import { assert } from '@/core/debug';
 import MainScene from '@/scenes/main-scene';
@@ -49,9 +49,17 @@ export default class App {
 
     this.scene = new MainScene();
     this.camera = new PerspectiveCamera(75, App.width/App.height, 0.1, 1000);
-    this.camera.position.z = 3;
+    this.camera.position.z = 10;
 
-    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+    // this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+    // this.controls.enablePan = false;
+    // this.controls.enableDamping = true;
+    // this.controls.minAzimuthAngle = -Math.PI * 1/3;
+    // this.controls.maxAzimuthAngle = Math.PI * 1/3;
+    // this.controls.minPolarAngle = Math.PI * 1/6;
+    // this.controls.maxPolarAngle = Math.PI * 5/6;
+    // this.controls.minDistance = 5;
+    // this.controls.maxDistance = 10;
 
     this.effectComposer = new EffectComposer(this.renderer);
     this.effectComposer.addPass(new RenderPass(this.scene, this.camera));
@@ -63,12 +71,12 @@ export default class App {
   }
 
   addEffectPass(effectPass: EffectPass): void {
-    console.log(this);
     this.effectComposer.addPass(effectPass);
   }
 
   onWindowResized(): void {
     this.renderer.setSize(App.width, App.height);
+    this.effectComposer.setSize(App.width, App.height);
     this.camera.aspect = App.width/App.height;
     this.camera.updateProjectionMatrix();
   }
@@ -78,7 +86,7 @@ export default class App {
 
     this.clock.getDelta();
     this.scene.update();
-    this.controls.update();
+    this.controls?.update();
 
     this.effectComposer.render();
   }

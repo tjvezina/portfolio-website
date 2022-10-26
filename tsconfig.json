@@ -11,6 +11,7 @@
     "baseUrl": "src",
     "paths": {
       "@/*": ["./*"],
+      "three/addons/*": ["../node_modules/@types/three/examples/jsm/*"],
     },
   },
 }

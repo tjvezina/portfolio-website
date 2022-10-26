@@ -1,7 +1,6 @@
 const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
-const TsconfigPathsWebpackPlugin = require('tsconfig-paths-webpack-plugin');
 
 module.exports = {
   mode: 'development',
@@ -29,8 +28,11 @@ module.exports = {
     ],
   },
   resolve: {
-    plugins: [new TsconfigPathsWebpackPlugin()],
     extensions: ['.ts', '.js'],
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+      'three/addons': path.resolve(__dirname, 'node_modules/three/examples/jsm/'),
+    }
   },
   plugins: [
     new HtmlWebpackPlugin({

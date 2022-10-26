@@ -1,2 +1,5 @@
 node_modules/
 dist/
+
+# Blender backup files
+**/*.blend1

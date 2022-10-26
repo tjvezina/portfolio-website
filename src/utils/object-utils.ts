@@ -2,20 +2,19 @@ import {
   EdgesGeometry,
   Mesh,
   MeshBasicMaterial,
-  Object3D,
   Vector2,
 } from 'three';
-import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
-import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
-import { Wireframe } from 'three/examples/jsm/lines/Wireframe.js';
+import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
+import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
+import { Wireframe } from 'three/addons/lines/Wireframe';
 
-export function createWireframeObject(geometry: THREE.BufferGeometry, {
+export function createWireframe(geometry: THREE.BufferGeometry, {
   color = 0xFFFFFF,
   includeFillMesh = true,
 }: {
   color?: number,
   includeFillMesh?: boolean,
-}): Object3D {
+}): Wireframe {
   const wireframeGeometry = new LineSegmentsGeometry().fromEdgesGeometry(new EdgesGeometry(geometry));
 
   const lineMaterial = new LineMaterial({

@@ -6,7 +6,7 @@ import {
 } from 'three';
 
 import App from '@/core/app';
-import { createWireframeObject } from '@/utils/object-utils';
+import { createWireframe } from '@/utils/object-utils';
 
 const SIDE_ANGLE = 2*Math.PI / 5;
 
@@ -44,7 +44,7 @@ export default class ShatterIcosa extends Object3D {
       0, 0, 0,
     ]), 3));
 
-    const shards = [new Object3D().add(createWireframeObject(geometry, { color: 0x00ff00 }))];
+    const shards = [new Object3D().add(createWireframe(geometry, { color: 0x00ff00 }))];
 
     for (let i = 0; i < 4; i++) {
       const shard = shards[0].clone();
