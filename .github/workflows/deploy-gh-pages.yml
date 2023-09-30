@@ -1,7 +1,11 @@
 name: Deploy GH Pages
+
 on:
   push:
     branches: ['main']
+  pull_request:
+    branches: ['main']
+
 jobs:
   deploy-gh-pages:
     runs-on: ubuntu-latest

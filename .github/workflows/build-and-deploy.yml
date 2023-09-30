@@ -1,11 +1,13 @@
-name: Deploy with Webpack
+name: Build and Deploy
+
 on:
   push:
-    branches: [ "main" ]
+    branches: ['main']
   pull_request:
-    branches: [ "main" ]
+    branches: ['main']
+
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
@@ -16,6 +18,9 @@ jobs:
       with:
         node-version: 16.x
         cache: 'yarn'
+
+    - name: Install dependencies
+      run: yarn install --frozen-lockfile
 
     - name: Build
       run: yarn build
