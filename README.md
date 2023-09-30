@@ -2,7 +2,7 @@
 
 This project contains the source code for my portfolio website.
 
-See the current build at https://tjvezina.github.io/portfolio-website/
+See the current build at https://tylerjvezina.com/
 
 ### Development
 
