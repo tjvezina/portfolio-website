@@ -30,7 +30,7 @@ export default class MainScene extends Scene {
     });
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore : Type definitions are incomplete
-    bloomEffect.mipmapBlurPass.radius = 2/3;
+    bloomEffect.mipmapBlurPass.radius = 0.2;
 
     App.addEffectPass(new EffectPass(App.camera, bloomEffect));
 
