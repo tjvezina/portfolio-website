@@ -13,6 +13,7 @@ module.exports = {
   devtool: 'inline-source-map',
   devServer: {
     static: './dist',
+    historyApiFallback: true, // Let the client side handle routing, directing all URL paths to the root index.ts
   },
   module: {
     rules: [
