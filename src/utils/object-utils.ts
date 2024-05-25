@@ -15,6 +15,7 @@ import { Font } from 'three/addons/loaders/FontLoader';
 
 import App from '@/core/app';
 import { assert } from '@/core/debug';
+import { NeonColor } from '@/scenes/main-scene';
 
 export enum WireframeType {
   Solid, // Front-facing edges only, with a solid black fill
@@ -22,12 +23,13 @@ export enum WireframeType {
 }
 
 export type WireframeOptions = {
-  color?: number,
+  color?: NeonColor,
+  fillColor?: NeonColor,
   type?: WireframeType,
 }
 
 export type TextOptions = {
-  color?: number,
+  color?: NeonColor,
   size?: number,
   alignX?: TextAlignX,
   alignY?: TextAlignY,
@@ -51,23 +53,24 @@ export function createWireframe(geometry: THREE.BufferGeometry, options?: Wirefr
   const wireframeGeometry = new LineSegmentsGeometry().fromEdgesGeometry(new EdgesGeometry(geometry));
 
   const lineMaterial = new LineMaterial({
-    color: options?.color ?? 0xFFFFFF,
+    color: options?.color ?? NeonColor.White,
     linewidth: App.lineWidth,
     resolution: new Vector2(window.innerWidth, window.innerHeight),
   });
 
   const wireframe = new Wireframe(wireframeGeometry, lineMaterial);
 
-  const type = options?.type ?? WireframeType.Solid;
-  if (type !== WireframeType.Hollow) {
-    const fillMaterial = new MeshBasicMaterial({
-      color: 0x000000,
-      polygonOffset: true,
-      polygonOffsetFactor: 3,
-      polygonOffsetUnits: 1,
-    });
-    const fillMesh = new Mesh(geometry, fillMaterial);
-    wireframe.add(fillMesh);
+  switch (options?.type ?? WireframeType.Solid) {
+    case WireframeType.Solid: {
+      const fillMaterial = new MeshBasicMaterial({
+        color: options?.fillColor ?? NeonColor.Black,
+        polygonOffset: true,
+        polygonOffsetFactor: 3,
+        polygonOffsetUnits: 1,
+      });
+      const fillMesh = new Mesh(geometry, fillMaterial);
+      wireframe.add(fillMesh);
+    }
   }
 
   return wireframe;
@@ -124,7 +127,7 @@ export function createText(text: string, font: Font, options?: TextOptions): Obj
 
   const alignX = options?.alignX ?? TextAlignX.Center;
   const alignY = options?.alignY ?? TextAlignY.Center;
-  const color = options?.color ?? 0xFFFFFF;
+  const color = options?.color ?? NeonColor.White;
 
   const textGeometry = new TextGeometry(text, {
     font,

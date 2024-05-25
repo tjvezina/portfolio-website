@@ -1,6 +1,5 @@
 import { EffectComposer, RenderPass } from 'postprocessing';
-import { Clock, Mesh, OrthographicCamera, PerspectiveCamera, Vector2, WebGLRenderer } from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { Clock, Mesh, OrthographicCamera, Raycaster, Vector2, WebGLRenderer } from 'three';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial';
 
 import { assert } from '@/core/debug';
@@ -18,8 +17,10 @@ export default class App {
   static get renderer(): WebGLRenderer { return App.#instance.renderer; }
   static get effectComposer(): EffectComposer { return App.#instance.effectComposer; }
 
-  static get camera(): PerspectiveCamera { return App.#instance.camera; }
+  static get camera(): OrthographicCamera { return App.#instance.camera; }
   static get scene(): MainScene { return App.#instance.scene; }
+
+  static get raycaster(): Raycaster { return App.#instance.raycaster; }
 
   static get clock(): Clock { return App.#instance.clock; }
   static get deltaTime(): number { return App.#instance.deltaTime; }
@@ -37,16 +38,16 @@ export default class App {
   renderer: WebGLRenderer;
   effectComposer: EffectComposer;
 
-  camera: PerspectiveCamera;
+  camera: OrthographicCamera;
   scene: MainScene;
+
+  raycaster = new Raycaster();
+  pointer = new Vector2();
 
   clock = new Clock();
   deltaTime = 0;
 
-  controls: OrbitControls;
-
   constructor() {
-    console.log(window.location)
     assert(App.#instance === undefined, 'An App instance already exists');
     App.#instance = this;
 
@@ -56,44 +57,20 @@ export default class App {
     document.body.appendChild(this.renderer.domElement);
 
     this.scene = new MainScene();
-    // this.camera = new OrthographicCamera();
-    this.camera = new PerspectiveCamera(75, App.width/App.height, 0.1, 1000);
+    this.camera = new OrthographicCamera();
     this.updateCameraBounds();
     this.camera.position.z = 10;
     this.scene.add(this.camera);
 
-    // this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-    // this.controls.enablePan = false;
-    // this.controls.enableDamping = true;
-    // this.controls.minAzimuthAngle = -Math.PI * 1/2;
-    // this.controls.maxAzimuthAngle = Math.PI * 1/2;
-    // this.controls.minPolarAngle = Math.PI * 0/6;
-    // this.controls.maxPolarAngle = Math.PI * 6/6;
-    // this.controls.minDistance = 5;
-    // this.controls.maxDistance = 10;
-
     this.effectComposer = new EffectComposer(this.renderer);
     this.effectComposer.addPass(new RenderPass(this.scene, this.camera));
 
-    window.addEventListener('load', this.onWindowLoad.bind(this));
     window.addEventListener('popstate', this.onWindowPopState.bind(this));
     window.addEventListener('resize', this.onWindowResized.bind(this));
+    window.addEventListener('pointermove', this.onPointerMove.bind(this));
 
     this.scene.init();
     this.draw();
-  }
-
-  onWindowLoad(event: UIEvent): void {
-    console.log('onload', event);
-    // let oldHref = document.location.href;
-    // const body = document.querySelector('body')!;
-    // const observer = new MutationObserver(mutations => {
-    //   if (oldHref !== document.location.href) {
-    //     oldHref = document.location.href;
-    //     console.log('location changed', oldHref);
-    //   }
-    // });
-    // observer.observe(body, { childList: true, subtree: true });
   }
 
   onWindowPopState(event: PopStateEvent): void {
@@ -116,28 +93,36 @@ export default class App {
       lineMaterial.resolution = resolution;
       lineMaterial.linewidth = lineWidth;
     }
+
+    this.scene.onWindowResized();
+  }
+
+  onPointerMove(event: PointerEvent): void {
+    this.pointer.x = (event.clientX / App.width) * 2 - 1;
+    this.pointer.y = -(event.clientY / App.height) * 2 + 1;
   }
 
   updateCameraBounds(): void {
     const { width, height, camera } = App;
 
-    // const viewScale = (width/height < VIEW_WIDTH/VIEW_HEIGHT ? width/VIEW_WIDTH : height/VIEW_HEIGHT);
+    const viewScale = (width/height < VIEW_WIDTH/VIEW_HEIGHT ? width/VIEW_WIDTH : height/VIEW_HEIGHT);
 
-    // camera.left = -width/2 / viewScale;
-    // camera.right = -camera.left;
-    // camera.bottom = -height/2 / viewScale;
-    // camera.top = -camera.bottom;
+    camera.left = -(width/2) / viewScale;
+    camera.right = -camera.left;
+    camera.bottom = -(height/2) / viewScale;
+    camera.top = -camera.bottom;
 
-    camera.aspect = width/height;
     camera.updateProjectionMatrix();
   }
 
   draw(): void {
     requestAnimationFrame(this.draw.bind(this));
 
+    this.raycaster.setFromCamera(this.pointer, App.camera);
+
     this.deltaTime = this.clock.getDelta();
     this.scene.update();
-    this.controls?.update();
+
 
     this.effectComposer.render();
   }
