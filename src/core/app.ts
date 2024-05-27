@@ -2,8 +2,8 @@ import { EffectComposer, RenderPass } from 'postprocessing';
 import { Clock, Mesh, OrthographicCamera, Raycaster, Vector2, WebGLRenderer } from 'three';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial';
 
-import { assert } from '@/core/debug';
 import MainScene from '@/scenes/main-scene';
+import { assert } from '@/utils/debug';
 import { findObjectsWhere } from '@/utils/scene-utils';
 
 const VIEW_WIDTH = 10;
@@ -74,7 +74,7 @@ export default class App {
   }
 
   onWindowPopState(event: PopStateEvent): void {
-    console.log('popstate', event.state)
+    console.log('popstate', event.state);
   }
 
   onWindowResized(): void {
@@ -119,10 +119,9 @@ export default class App {
     requestAnimationFrame(this.draw.bind(this));
 
     this.raycaster.setFromCamera(this.pointer, App.camera);
-
     this.deltaTime = this.clock.getDelta();
-    this.scene.update();
 
+    this.scene.update();
 
     this.effectComposer.render();
   }
