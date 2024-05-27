@@ -2,8 +2,9 @@ export enum NeonColor {
   White = 0xffffff,
   Gray = 0x171717,
   Black = 0x000000,
-  Pink = 0xc254d5,
-  Orange = 0xe86b2c,
+  Yellow = 0xe6e63c,
+  Orange = 0xf28955,
   Green= 0x55f255,
-  Blue = 0x55ddf2,
+  Cyan = 0x55ddf2,
+  Pink = 0xc254d5,
 }

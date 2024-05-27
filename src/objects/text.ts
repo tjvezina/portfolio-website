@@ -1,4 +1,4 @@
-import { Mesh, MeshBasicMaterial, Object3D, ShapeGeometry, Vector3 } from 'three';
+import { Color, Mesh, MeshBasicMaterial, Object3D, ShapeGeometry, Vector3 } from 'three';
 import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry';
 import { Font } from 'three/examples/jsm/loaders/FontLoader';
 
@@ -18,7 +18,7 @@ export enum TextAlignY {
 }
 
 export type TextOptions = {
-  color?: NeonColor,
+  color?: NeonColor | Color,
   size?: number,
   alignX?: TextAlignX,
   alignY?: TextAlignY,

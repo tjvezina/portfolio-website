@@ -1,6 +1,5 @@
 import { BloomEffect, EffectPass } from 'postprocessing';
 import { Scene } from 'three';
-import { FontLoader } from 'three/addons/loaders/FontLoader';
 
 import App from '@/core/app';
 import { NeonColor } from '@/core/neon-color';
@@ -17,7 +16,7 @@ export enum ProjectArea {
 export default class MainScene extends Scene {
   titleText: Text;
 
-  mainView = new MainView();
+  mainView: MainView;
 
   init(): void {
     const bloomEffect = new BloomEffect({
@@ -30,16 +29,15 @@ export default class MainScene extends Scene {
     bloomEffect.mipmapBlurPass.radius = 0.2;
     App.effectComposer.addPass(new EffectPass(App.camera, bloomEffect));
 
+    this.mainView = new MainView();
     this.mainView.init();
-    App.scene.add(this.mainView);
+    this.add(this.mainView);
 
-    new FontLoader().load('./assets/fonts/syntha/Syntha.json', font => {
-      this.titleText = new Text('Tyler•J•Vezina'.toUpperCase(), font, { color: NeonColor.Pink, size: 0.16 * App.pixelRatio, alignX: TextAlignX.Left, alignY: TextAlignY.Top });
-      this.titleText.position.x = -5*Math.max(1, App.width/App.height) + 0.3;
-      this.titleText.position.y = 5*Math.max(1, App.height/App.width) - 0.3;
-      this.titleText.position.z = 5;
-      App.camera.attach(this.titleText);
-    });
+    this.titleText = new Text('Tyler•J•Vezina'.toUpperCase(), App.synthaFont, { color: NeonColor.Pink, size: 0.16 * App.pixelRatio, alignX: TextAlignX.Left, alignY: TextAlignY.Top });
+    this.titleText.position.x = -5*Math.max(1, App.width/App.height) + 0.3;
+    this.titleText.position.y = 5*Math.max(1, App.height/App.width) - 0.3;
+    this.titleText.position.z = 5;
+    App.camera.attach(this.titleText);
 
     // window.addEventListener('click', this.onClick.bind(this));
   }

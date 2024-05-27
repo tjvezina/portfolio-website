@@ -1,6 +1,7 @@
 import { EffectComposer, RenderPass } from 'postprocessing';
 import { Clock, Mesh, OrthographicCamera, Raycaster, Vector2, WebGLRenderer } from 'three';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial';
+import { Font, FontLoader } from 'three/examples/jsm/loaders/FontLoader';
 
 import MainScene from '@/scenes/main-scene';
 import { assert } from '@/utils/debug';
@@ -14,16 +15,15 @@ export default class App {
 
   static get isTouchscreen(): boolean { return typeof window.ontouchstart !== 'undefined'; }
 
+  static get camera(): OrthographicCamera { return App.#instance.camera; }
+  static get scene(): MainScene { return App.#instance.scene; }
   static get renderer(): WebGLRenderer { return App.#instance.renderer; }
   static get effectComposer(): EffectComposer { return App.#instance.effectComposer; }
 
-  static get camera(): OrthographicCamera { return App.#instance.camera; }
-  static get scene(): MainScene { return App.#instance.scene; }
-
-  static get raycaster(): Raycaster { return App.#instance.raycaster; }
-
   static get clock(): Clock { return App.#instance.clock; }
   static get deltaTime(): number { return App.#instance.deltaTime; }
+
+  static get raycaster(): Raycaster { return App.#instance.raycaster; }
 
   static get width(): number { return window.innerWidth; }
   static get height(): number { return window.innerHeight; }
@@ -31,21 +31,24 @@ export default class App {
 
   static get lineWidth(): number { return Math.min(this.width, this.height) / 325; }
 
+  static get synthaFont(): Font { return App.#instance.synthaFont; }
+
   static init(): void {
     new App(); // eslint-disable-line no-new
   }
 
+  camera: OrthographicCamera;
+  scene: MainScene;
   renderer: WebGLRenderer;
   effectComposer: EffectComposer;
 
-  camera: OrthographicCamera;
-  scene: MainScene;
+  clock = new Clock();
+  deltaTime = 0;
 
   raycaster = new Raycaster();
   pointer = new Vector2();
 
-  clock = new Clock();
-  deltaTime = 0;
+  synthaFont: Font;
 
   constructor() {
     assert(App.#instance === undefined, 'An App instance already exists');
@@ -69,8 +72,17 @@ export default class App {
     window.addEventListener('resize', this.onWindowResized.bind(this));
     window.addEventListener('pointermove', this.onPointerMove.bind(this));
 
-    this.scene.init();
-    this.draw();
+    this.load();
+  }
+
+  load(): void {
+    new FontLoader().load('./assets/fonts/syntha/Syntha.json', font => {
+      this.synthaFont = font;
+
+      // TODO: Init scene after all assets are loaded
+      this.scene.init();
+      this.draw();
+    });
   }
 
   onWindowPopState(event: PopStateEvent): void {
