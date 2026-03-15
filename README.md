@@ -4,6 +4,11 @@ This project contains the source code for my portfolio website.
 
 See the current build at https://tylerjvezina.com/
 
+### Setup
+
+- `yarn`
+  - Install project dependencies
+
 ### Development
 
 - `yarn build`
