@@ -47,6 +47,8 @@ export default class MainScene extends Scene {
       this.mainView.anchorList,
       this.mainView.planetList,
       this.mainView.planetAnchorRoot,
+      this.mainView.stars,
+      this.mainView.starIntroAlphas,
     );
 
     // window.addEventListener('click', this.onClick.bind(this));
