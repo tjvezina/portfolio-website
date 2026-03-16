@@ -3,23 +3,57 @@ import { Object3D, Quaternion, Vector3 } from 'three';
 import Behaviour from '@/behaviours/behaviour';
 import App from '@/core/app';
 
+export interface TumbleConfig {
+  /** Base rotation speed in rad/s. */
+  rotationRate: number;
+  /** How quickly the tumble axis drifts, in rad/s. */
+  axisDrift: number;
+  /** Amplitude of the organic wobble in radians per second. */
+  wobbleStrength: number;
+  /** Time-scale multiplier for the wobble oscillation. */
+  wobbleSpeed: number;
+}
+
+const defaultConfig: TumbleConfig = {
+  rotationRate: 1/6 * Math.PI,
+  axisDrift: 0.5,
+  wobbleStrength: 0.5,
+  wobbleSpeed: 1/6 * Math.PI,
+};
+
+// Reusable temporaries to avoid per-frame allocations
+const _q = new Quaternion();
+const _xAxis = new Vector3(1, 0, 0);
+const _axis = new Vector3();
+
 export class Tumble extends Behaviour {
   quaternion: Quaternion;
-  speedMultiplier: number;
+  config: TumbleConfig;
 
-  constructor(owner: Object3D, speedMultiplier = 1) {
+  constructor(owner: Object3D, config: Partial<TumbleConfig> = {}) {
     super(owner);
 
     this.quaternion = new Quaternion().random();
-    this.speedMultiplier = speedMultiplier;
+    this.config = { ...defaultConfig, ...config };
   }
 
   update(): void {
-    const m = this.speedMultiplier;
-    const t = App.clock.elapsedTime * (2*Math.PI) / 5;
-    const wiggle = (Math.sin(1.1*t) + Math.sin(3.4*t) + Math.sin(6.7*t)) / (3/m);
-    this.quaternion.multiply(new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), 2*Math.PI / (360/m)));
-    this.quaternion.multiply(new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), wiggle / 25));
-    this.owner.rotateOnWorldAxis(new Vector3(0, 1, 0).applyQuaternion(this.quaternion), 2*Math.PI / (3/m) * App.deltaTime);
+    const dt = App.deltaTime;
+
+    // Organic wobble signal (sum of incommensurate sines)
+    const t = App.clock.elapsedTime * this.config.wobbleSpeed;
+    const wiggle = (Math.sin(1.1 * t) + Math.sin(3.4 * t) + Math.sin(6.7 * t)) / 3;
+
+    // Drift the internal reference frame
+    this.quaternion.multiply(
+      _q.setFromAxisAngle(_xAxis, this.config.axisDrift * dt),
+    );
+    this.quaternion.multiply(
+      _q.setFromAxisAngle(_axis.set(0, 1, 0), wiggle * this.config.wobbleStrength * dt),
+    );
+
+    // Apply world rotation along the drifted axis
+    _axis.set(0, 1, 0).applyQuaternion(this.quaternion);
+    this.owner.rotateOnWorldAxis(_axis, this.config.rotationRate * dt);
   }
 }

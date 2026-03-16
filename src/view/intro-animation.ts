@@ -108,7 +108,7 @@ export default class IntroAnimation {
       for (const planet of this.planets) {
         planet.position.z = -5 * (1 - radius);
       }
-      this.planetAnchorRoot.rotateZ(-ORBIT_BOOST * (1 - planetsT) * App.deltaTime);
+      this.planetAnchorRoot.rotateZ(-ORBIT_BOOST * Math.pow(1 - planetsT, 2) * App.deltaTime);
     }
 
     // Stars: radial fade from center outward
