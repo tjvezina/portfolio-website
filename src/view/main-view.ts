@@ -8,6 +8,12 @@ import Wireframe from '@/objects/wireframe';
 import { ProjectArea } from '@/scenes/main-scene';
 import { addBehaviour } from '@/utils/scene-utils';
 
+let inputEnabled = false;
+
+export function setInputEnabled(enabled: boolean): void {
+  inputEnabled = enabled;
+}
+
 class Planet extends Object3D {
   area: ProjectArea;
   wireframe: Wireframe;
@@ -46,7 +52,7 @@ class Planet extends Object3D {
     this.text.position.copy(anchorPos);
 
     // const wasHovered = this.isHovered;
-    const isHovered = App.raycaster.intersectObject(this).length > 0;
+    const isHovered = inputEnabled && App.raycaster.intersectObject(this).length > 0;
 
     this.glowStrength = Math.max(0, Math.min(1, (this.glowStrength ?? 0) + (isHovered ? 0.1 : -0.1)));
     this.wireframe.fillMaterial?.color.set(new Color(0, 0, 0).lerp(this.glowColor, this.glowStrength));
@@ -70,6 +76,7 @@ export class MainView extends Object3D {
   planetList: Planet[] = [];
 
   planetAnchorRoot: Object3D;
+  anchorList: Object3D[] = [];
 
   init(): void {
     this.sun = new Wireframe(new CircleGeometry(1, 64), { color: NeonColor.White, fillColor: NeonColor.White });
@@ -77,7 +84,6 @@ export class MainView extends Object3D {
     this.planetAnchorRoot = new Object3D();
     this.planetAnchorRoot.rotateX(-Math.PI/4);
 
-    const anchorList: Object3D[] = [];
     for (let i = 0; i < 3; i++) {
       const anchor = new Object3D();
       this.planetAnchorRoot.add(anchor);
@@ -87,13 +93,13 @@ export class MainView extends Object3D {
       const y = Math.sin(a) * 4;
 
       anchor.position.set(x, y, 0);
-      anchorList.push(anchor);
+      this.anchorList.push(anchor);
     }
 
     this.planetList.push(
-      new Planet(ProjectArea.College, new Wireframe(new BoxGeometry(0.9, 0.9, 0.9), { color: NeonColor.Orange }), anchorList[0]),
-      new Planet(ProjectArea.Personal, new Wireframe(new OctahedronGeometry(0.75), { color: NeonColor.Green }), anchorList[1]),
-      new Planet(ProjectArea.Career, new Wireframe(new IcosahedronGeometry(0.75), { color: NeonColor.Cyan }), anchorList[2]),
+      new Planet(ProjectArea.College, new Wireframe(new BoxGeometry(0.9, 0.9, 0.9), { color: NeonColor.Orange }), this.anchorList[0]),
+      new Planet(ProjectArea.Personal, new Wireframe(new OctahedronGeometry(0.75), { color: NeonColor.Green }), this.anchorList[1]),
+      new Planet(ProjectArea.Career, new Wireframe(new IcosahedronGeometry(0.75), { color: NeonColor.Cyan }), this.anchorList[2]),
     );
 
     this.add(this.sun, this.planetAnchorRoot, ...this.planetList);

@@ -5,7 +5,8 @@ import App from '@/core/app';
 import { NeonColor } from '@/core/neon-color';
 import Text, { TextAlignX, TextAlignY } from '@/objects/text';
 import { updateBehaviours } from '@/utils/scene-utils';
-import { MainView } from '@/view/main-view';
+import IntroAnimation from '@/view/intro-animation';
+import { MainView, setInputEnabled } from '@/view/main-view';
 
 export enum ProjectArea {
   College = 'college',
@@ -17,6 +18,7 @@ export default class MainScene extends Scene {
   titleText: Text;
 
   mainView: MainView;
+  intro: IntroAnimation | null;
 
   init(): void {
     const bloomEffect = new BloomEffect({
@@ -33,11 +35,19 @@ export default class MainScene extends Scene {
     this.mainView.init();
     this.add(this.mainView);
 
-    this.titleText = new Text('Tyler•J•Vezina'.toUpperCase(), App.synthaFont, { color: NeonColor.Pink, size: 0.16 * App.pixelRatio, alignX: TextAlignX.Left, alignY: TextAlignY.Top });
+    this.titleText = new Text('Tyler J Vezina'.toUpperCase(), App.synthaFont, { color: NeonColor.Pink, size: 0.16 * App.pixelRatio, alignX: TextAlignX.Left, alignY: TextAlignY.Top });
     this.titleText.position.x = -5*Math.max(1, App.width/App.height) + 0.3;
     this.titleText.position.y = 5*Math.max(1, App.height/App.width) - 0.3;
     this.titleText.position.z = 5;
     App.camera.attach(this.titleText);
+
+    this.intro = new IntroAnimation(
+      this.titleText,
+      this.mainView.sun,
+      this.mainView.anchorList,
+      this.mainView.planetList,
+      this.mainView.planetAnchorRoot,
+    );
 
     // window.addEventListener('click', this.onClick.bind(this));
   }
@@ -70,6 +80,16 @@ export default class MainScene extends Scene {
   }
 
   update(): void {
+    if (this.intro) {
+      this.intro.update();
+      if (this.intro.inputReady) {
+        setInputEnabled(true);
+      }
+      if (this.intro.isComplete) {
+        this.intro = null;
+      }
+    }
+
     this.mainView.update();
 
     updateBehaviours(this);
