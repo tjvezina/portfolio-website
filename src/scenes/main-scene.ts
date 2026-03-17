@@ -46,15 +46,22 @@ export default class MainScene extends Scene {
     this.starField.position.z = -15;
     App.camera.add(this.starField);
 
-    this.intro = new IntroAnimation(
-      this.titleText,
-      this.viewManager.homeView.sun,
-      this.viewManager.homeView.anchorList,
-      this.viewManager.homeView.planetList,
-      this.viewManager.homeView.planetAnchorRoot,
-      this.starField,
-      this.starField.introAlphas,
-    );
+    const initialRoute = App.router.route;
+    if (initialRoute.type === 'home') {
+      this.intro = new IntroAnimation(
+        this.titleText,
+        this.viewManager.homeView.sun,
+        this.viewManager.homeView.anchorList,
+        this.viewManager.homeView.planetList,
+        this.viewManager.homeView.planetAnchorRoot,
+        this.starField,
+        this.starField.introAlphas,
+      );
+    } else {
+      this.intro = null;
+      this.starField.introAlphas.fill(1);
+      this.viewManager.initializeAtRoute(initialRoute);
+    }
 
     // window.addEventListener('click', this.onClick.bind(this));
   }

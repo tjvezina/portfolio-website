@@ -167,6 +167,73 @@ export default class ViewManager extends Object3D {
     this.pendingProjectBack = true;
   }
 
+  initializeAtRoute(route: Route): void {
+    switch (route.type) {
+      case 'home':
+        // Default — intro animation plays as usual
+        break;
+      case 'category': {
+        this.showCategoryImmediate(route.area);
+        break;
+      }
+      case 'project': {
+        this.showCategoryImmediate(route.area);
+        this.showProjectImmediate(route.area, route.slug);
+        break;
+      }
+    }
+  }
+
+  private showCategoryImmediate(area: ProjectArea): void {
+    // Create and cache grid view
+    if (!this.categoryViews.has(area)) {
+      const gridView = new CategoryGridView(area);
+      this.wireGridCallbacks(gridView, area);
+      this.categoryViews.set(area, gridView);
+      this.add(gridView);
+    }
+    const gridView = this.categoryViews.get(area)!;
+
+    // Get planet world position
+    const planet = this.homeView.planetList.find((p) => p.area === area)!;
+    const targetPos = new Vector3();
+    planet.wireframe.getWorldPosition(targetPos);
+
+    // Position grid at planet location, make visible
+    gridView.position.set(targetPos.x, targetPos.y, 0);
+    gridView.visible = true;
+    gridView.enableInput();
+
+    // Position camera directly at grid (no animation)
+    App.camera.position.x = targetPos.x;
+    App.camera.position.y = targetPos.y;
+
+    setInputEnabled(false);
+    this.activeCategory = area;
+  }
+
+  private showProjectImmediate(area: ProjectArea, slug: string): void {
+    const projectData = getProjectData(area, slug);
+    if (!projectData) return;
+
+    const color = CATEGORY_COLORS[area];
+    const projectView = new ProjectPageView(projectData, color);
+
+    // Position behind the grid
+    const gridView = this.categoryViews.get(area);
+    if (gridView) {
+      projectView.position.set(gridView.position.x, gridView.position.y, -5);
+      gridView.disableInput();
+    }
+
+    projectView.visible = true;
+    this.add(projectView);
+    this.activeProjectView = projectView;
+
+    // Move camera to project page position (no animation)
+    App.camera.position.z = App.camera.position.z - 5;
+  }
+
   private startHomeCamera(): void {
     const cameraTarget = new Vector3(0, 0, App.camera.position.z);
     this.activeTransition = new CameraTransition(cameraTarget, 1.2);
