@@ -1,14 +1,25 @@
 import { Object3D, Vector3 } from 'three';
 
 import App from '@/core/app';
+import { NeonColor } from '@/core/neon-color';
 import { NavigationDirection, Route } from '@/core/router';
+import { getProjectData } from '@/data/loader';
 import { ProjectArea } from '@/scenes/main-scene';
 import CategoryGridView from '@/view/category-grid-view';
+import GridCell from '@/view/grid/grid-cell';
 import { HomeView, setInputEnabled } from '@/view/home-view';
+import ProjectPageView from '@/view/project-page-view';
 import CameraTransition from '@/view/transition/camera-transition';
+import PrismPushTransition from '@/view/transition/prism-push-transition';
 import UnfoldTransition from '@/view/transition/unfold-transition';
 
 export { setInputEnabled };
+
+const CATEGORY_COLORS: Record<ProjectArea, NeonColor> = {
+  [ProjectArea.College]: NeonColor.Orange,
+  [ProjectArea.Personal]: NeonColor.Green,
+  [ProjectArea.Career]: NeonColor.Cyan,
+};
 
 export default class ViewManager extends Object3D {
   homeView: HomeView;
@@ -19,6 +30,12 @@ export default class ViewManager extends Object3D {
 
   /** When navigating home, we run unfold-reverse first, then camera. */
   private pendingHomeTransition = false;
+
+  /** Project page state */
+  private activeProjectView: ProjectPageView | null = null;
+  private activePrismPush: PrismPushTransition | null = null;
+  private activeProjectCell: GridCell | null = null;
+  private pendingProjectBack = false;
 
   constructor() {
     super();
@@ -34,9 +51,15 @@ export default class ViewManager extends Object3D {
 
   onRouteChanged(route: Route, direction: NavigationDirection): void {
     if (route.type === 'category') {
-      this.showCategory(route.area);
+      if (direction === 'back' && this.activeProjectView) {
+        this.hideProject();
+      } else {
+        this.showCategory(route.area);
+      }
     } else if (route.type === 'home') {
       this.showHome();
+    } else if (route.type === 'project') {
+      this.showProject(route.area, route.slug);
     }
     console.log('ViewManager: route changed', route.type, direction);
   }
@@ -45,6 +68,7 @@ export default class ViewManager extends Object3D {
     let grid = this.categoryViews.get(area);
     if (!grid) {
       grid = new CategoryGridView(area);
+      this.wireGridCallbacks(grid, area);
       this.categoryViews.set(area, grid);
       this.add(grid);
     }
@@ -84,6 +108,65 @@ export default class ViewManager extends Object3D {
     setInputEnabled(false);
   }
 
+  private wireGridCallbacks(grid: CategoryGridView, area: ProjectArea): void {
+    grid.onProjectClicked = (project): void => {
+      // Find the clicked cell to pass to the transition
+      const cell = grid.cells.find(c => c.project === project);
+      if (cell) {
+        this.activeProjectCell = cell;
+      }
+      App.router.navigate({ type: 'project', area, slug: project.slug });
+    };
+  }
+
+  private showProject(area: ProjectArea, slug: string): void {
+    const project = getProjectData(area, slug);
+    if (!project) return;
+
+    const color = CATEGORY_COLORS[area];
+
+    // Disable grid input during transition
+    const grid = this.categoryViews.get(area);
+    grid?.disableInput();
+
+    // Create project page behind the grid
+    const projectView = new ProjectPageView(project, color);
+    if (grid) {
+      projectView.position.set(grid.position.x, grid.position.y, -5);
+    }
+    this.add(projectView);
+    this.activeProjectView = projectView;
+
+    // Start prism push transition if we have a clicked cell
+    if (this.activeProjectCell) {
+      this.activePrismPush = new PrismPushTransition(this.activeProjectCell, false);
+    }
+
+    // Move camera forward through the grid
+    const cameraTarget = new Vector3(
+      App.camera.position.x,
+      App.camera.position.y,
+      App.camera.position.z - 5,
+    );
+    this.activeTransition = new CameraTransition(cameraTarget, 1.0);
+  }
+
+  private hideProject(): void {
+    // Start reverse prism push
+    if (this.activeProjectCell) {
+      this.activePrismPush = new PrismPushTransition(this.activeProjectCell, true);
+    }
+
+    // Move camera back to grid plane
+    const cameraTarget = new Vector3(
+      App.camera.position.x,
+      App.camera.position.y,
+      App.camera.position.z + 5,
+    );
+    this.activeTransition = new CameraTransition(cameraTarget, 1.0);
+    this.pendingProjectBack = true;
+  }
+
   private startHomeCamera(): void {
     const cameraTarget = new Vector3(0, 0, App.camera.position.z);
     this.activeTransition = new CameraTransition(cameraTarget, 1.2);
@@ -92,6 +175,14 @@ export default class ViewManager extends Object3D {
   }
 
   update(): void {
+    // Update prism push independently of other transitions
+    if (this.activePrismPush) {
+      this.activePrismPush.update();
+      if (this.activePrismPush.isComplete) {
+        this.activePrismPush = null;
+      }
+    }
+
     // Sequence: camera transition first, then unfold (for forward navigation)
     // For back navigation: unfold reverse first, then camera
     if (this.activeUnfold) {
@@ -111,7 +202,23 @@ export default class ViewManager extends Object3D {
       if (this.activeTransition.isComplete) {
         this.activeTransition = null;
 
-        if (this.activeCategory) {
+        if (this.pendingProjectBack) {
+          // Camera returned to grid — clean up project view, re-enable grid
+          this.pendingProjectBack = false;
+          if (this.activeProjectView) {
+            this.activeProjectView.dispose();
+            this.remove(this.activeProjectView);
+            this.activeProjectView = null;
+          }
+          this.activeProjectCell = null;
+          if (this.activeCategory) {
+            const grid = this.categoryViews.get(this.activeCategory);
+            grid?.enableInput();
+          }
+        } else if (this.activeProjectView) {
+          // Camera arrived at project — project page is now visible
+          // Nothing extra needed; the view is already added to the scene
+        } else if (this.activeCategory) {
           // Camera arrived at category — start unfold
           const grid = this.categoryViews.get(this.activeCategory);
           if (grid) {
