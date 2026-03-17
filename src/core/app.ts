@@ -90,7 +90,7 @@ export default class App {
   }
 
   onRouteChanged(route: Route, direction: NavigationDirection): void {
-    console.log('Route changed:', route, direction);
+    this.scene.viewManager.onRouteChanged(route, direction);
   }
 
   onWindowResized(): void {
