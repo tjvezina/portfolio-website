@@ -6,6 +6,7 @@ import { ProjectArea } from '@/scenes/main-scene';
 import CategoryGridView from '@/view/category-grid-view';
 import { HomeView, setInputEnabled } from '@/view/home-view';
 import CameraTransition from '@/view/transition/camera-transition';
+import UnfoldTransition from '@/view/transition/unfold-transition';
 
 export { setInputEnabled };
 
@@ -13,7 +14,11 @@ export default class ViewManager extends Object3D {
   homeView: HomeView;
   categoryViews: Map<ProjectArea, CategoryGridView> = new Map();
   activeTransition: CameraTransition | null = null;
+  activeUnfold: UnfoldTransition | null = null;
   activeCategory: ProjectArea | null = null;
+
+  /** When navigating home, we run unfold-reverse first, then camera. */
+  private pendingHomeTransition = false;
 
   constructor() {
     super();
@@ -58,8 +63,8 @@ export default class ViewManager extends Object3D {
       this.activeTransition = new CameraTransition(cameraTarget, 1.2);
     }
 
-    grid.visible = true;
-    grid.enableInput();
+    // Grid starts hidden; unfold will reveal it after camera transition completes
+    grid.visible = false;
 
     setInputEnabled(false);
     this.activeCategory = area;
@@ -69,23 +74,53 @@ export default class ViewManager extends Object3D {
     if (this.activeCategory) {
       const grid = this.categoryViews.get(this.activeCategory);
       if (grid) {
-        grid.visible = false;
         grid.disableInput();
+        // Start reverse unfold; camera transition starts after it completes
+        this.activeUnfold = new UnfoldTransition(grid, this.activeCategory, true, 0.8);
+        this.pendingHomeTransition = true;
       }
     }
 
+    setInputEnabled(false);
+  }
+
+  private startHomeCamera(): void {
     const cameraTarget = new Vector3(0, 0, App.camera.position.z);
     this.activeTransition = new CameraTransition(cameraTarget, 1.2);
-
-    setInputEnabled(true);
+    this.pendingHomeTransition = false;
     this.activeCategory = null;
   }
 
   update(): void {
-    if (this.activeTransition) {
+    // Sequence: camera transition first, then unfold (for forward navigation)
+    // For back navigation: unfold reverse first, then camera
+    if (this.activeUnfold) {
+      this.activeUnfold.update();
+      if (this.activeUnfold.isComplete) {
+        this.activeUnfold = null;
+        if (this.pendingHomeTransition) {
+          this.startHomeCamera();
+        } else if (this.activeCategory) {
+          // Forward unfold complete — enable grid input
+          const grid = this.categoryViews.get(this.activeCategory);
+          grid?.enableInput();
+        }
+      }
+    } else if (this.activeTransition) {
       this.activeTransition.update();
       if (this.activeTransition.isComplete) {
         this.activeTransition = null;
+
+        if (this.activeCategory) {
+          // Camera arrived at category — start unfold
+          const grid = this.categoryViews.get(this.activeCategory);
+          if (grid) {
+            this.activeUnfold = new UnfoldTransition(grid, this.activeCategory, false);
+          }
+        } else {
+          // Camera returned home
+          setInputEnabled(true);
+        }
       }
     }
 
