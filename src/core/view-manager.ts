@@ -1,20 +1,101 @@
-import { Object3D, Vector3 } from 'three';
+import { BufferGeometry, Mesh, Object3D, Quaternion, Vector3 } from 'three';
 
 import App from '@/core/app';
 import { NeonColor } from '@/core/neon-color';
 import { NavigationDirection, Route } from '@/core/router';
 import { getProjectData } from '@/data/loader';
 import { ProjectArea } from '@/data/types';
+import Wireframe from '@/objects/wireframe';
 import BackButton from '@/view/back-button';
 import CategoryGridView from '@/view/category-grid-view';
 import GridCell from '@/view/grid/grid-cell';
-import { HomeView, setInputEnabled } from '@/view/home-view';
+import { HomeView, Planet, setInputEnabled } from '@/view/home-view';
 import ProjectPageView from '@/view/project-page-view';
 import CameraTransition from '@/view/transition/camera-transition';
 import PrismPushTransition from '@/view/transition/prism-push-transition';
 import UnfoldTransition from '@/view/transition/unfold-transition';
 
 export { setInputEnabled };
+
+const CAMERA_FORWARD = new Vector3(0, 0, 1);
+
+/**
+ * Extract unique face normals from a BufferGeometry.
+ */
+function getFaceNormals(geometry: BufferGeometry): Vector3[] {
+  const positions = geometry.getAttribute('position');
+  const index = geometry.getIndex();
+  const normals: Vector3[] = [];
+  const seen = new Set<string>();
+
+  const v0 = new Vector3();
+  const v1 = new Vector3();
+  const v2 = new Vector3();
+  const edge1 = new Vector3();
+  const edge2 = new Vector3();
+  const normal = new Vector3();
+
+  const faceCount = index ? index.count / 3 : positions.count / 3;
+
+  for (let i = 0; i < faceCount; i++) {
+    const i0 = index ? index.getX(i * 3) : i * 3;
+    const i1 = index ? index.getX(i * 3 + 1) : i * 3 + 1;
+    const i2 = index ? index.getX(i * 3 + 2) : i * 3 + 2;
+
+    v0.fromBufferAttribute(positions, i0);
+    v1.fromBufferAttribute(positions, i1);
+    v2.fromBufferAttribute(positions, i2);
+
+    edge1.subVectors(v1, v0);
+    edge2.subVectors(v2, v0);
+    normal.crossVectors(edge1, edge2).normalize();
+
+    const key = `${normal.x.toFixed(3)},${normal.y.toFixed(3)},${normal.z.toFixed(3)}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      normals.push(normal.clone());
+    }
+  }
+
+  return normals;
+}
+
+/**
+ * Compute a target quaternion that aligns the nearest face toward a direction.
+ */
+function computeFaceAlignTarget(
+  currentQuat: Quaternion,
+  faceNormals: Vector3[],
+  targetDir: Vector3,
+): Quaternion {
+  let bestNormal = faceNormals[0];
+  let bestDot = -Infinity;
+
+  for (const fn of faceNormals) {
+    const worldNormal = fn.clone().applyQuaternion(currentQuat);
+    const dot = worldNormal.dot(targetDir);
+    if (dot > bestDot) {
+      bestDot = dot;
+      bestNormal = fn;
+    }
+  }
+
+  const currentDir = bestNormal.clone().applyQuaternion(currentQuat);
+  const correction = new Quaternion().setFromUnitVectors(currentDir, targetDir);
+  return correction.multiply(currentQuat.clone());
+}
+
+/**
+ * Get the source BufferGeometry from a Wireframe's fill mesh child.
+ */
+function getSourceGeometry(wireframe: Wireframe): BufferGeometry | null {
+  for (const child of wireframe.children) {
+    if (child instanceof Mesh) {
+      return child.geometry as BufferGeometry;
+    }
+  }
+  return null;
+}
 
 const CATEGORY_COLORS: Record<ProjectArea, NeonColor> = {
   [ProjectArea.College]: NeonColor.Orange,
@@ -85,6 +166,9 @@ export default class ViewManager extends Object3D {
       this.add(grid);
     }
 
+    // Stop all orbital motion so the camera target is stable
+    this.homeView.stopOrbiting();
+
     // Get planet world position for camera target
     const planet = this.homeView.planetList.find(p => p.area === area);
     if (planet) {
@@ -98,6 +182,9 @@ export default class ViewManager extends Object3D {
       // Camera target: planet x,y but keep current z
       const cameraTarget = new Vector3(planetPos.x, planetPos.y, App.camera.position.z);
       this.activeTransition = new CameraTransition(cameraTarget, 1.2);
+
+      // Decelerate tumble and align a face toward the camera
+      this.startTumbleDecel(planet);
     }
 
     // Grid starts hidden; unfold will reveal it after camera transition completes
@@ -119,9 +206,33 @@ export default class ViewManager extends Object3D {
         this.activeUnfold = new UnfoldTransition(grid, this.activeCategory, true, 0.8);
         this.pendingHomeTransition = true;
       }
+
+      // Resume tumble on the planet that was stopped
+      const planet = this.homeView.planetList.find(p => p.area === this.activeCategory);
+      if (planet) {
+        planet.tumble.resume();
+      }
     }
 
+    // Resume orbital motion
+    this.homeView.resumeOrbiting();
+
     setInputEnabled(false);
+  }
+
+  private startTumbleDecel(planet: Planet): void {
+    const geometry = getSourceGeometry(planet.wireframe);
+    if (!geometry) return;
+
+    const faceNormals = getFaceNormals(geometry);
+    const alignTarget = computeFaceAlignTarget(
+      planet.wireframe.quaternion,
+      faceNormals,
+      CAMERA_FORWARD,
+    );
+
+    // Decelerate over 0.8s, then align to face over 0.4s
+    planet.tumble.decelerateAndAlign(0.8, alignTarget, 0.4);
   }
 
   private wireGridCallbacks(grid: CategoryGridView, area: ProjectArea): void {

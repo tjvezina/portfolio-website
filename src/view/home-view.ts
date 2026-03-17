@@ -19,6 +19,7 @@ export class Planet extends Object3D {
   wireframe: Wireframe;
   anchor: Object3D;
   text: Text;
+  tumble: Tumble;
 
   isHovered = false;
   glowStrength = 0;
@@ -33,7 +34,8 @@ export class Planet extends Object3D {
     this.wireframe = wireframe;
     this.anchor = anchor;
 
-    addBehaviour(this.wireframe, new Tumble(this.wireframe));
+    this.tumble = new Tumble(this.wireframe);
+    addBehaviour(this.wireframe, this.tumble);
     this.add(this.wireframe);
 
     this.text = new Text(this.area.toUpperCase(), App.synthaFont, { color: this.wireframe.lineMaterial.color, size: 0.3 });
@@ -70,6 +72,8 @@ export class Planet extends Object3D {
   }
 }
 
+const BASE_ORBIT_SPEED = -Math.PI / 16;
+
 export class HomeView extends Object3D {
   sun: Wireframe;
 
@@ -79,6 +83,11 @@ export class HomeView extends Object3D {
   anchorList: Object3D[] = [];
 
   onPlanetClicked: ((area: ProjectArea) => void) | null = null;
+
+  private orbitSpeed = BASE_ORBIT_SPEED;
+  private orbitDecelerating = false;
+  private orbitDecelDuration = 0;
+  private orbitDecelElapsed = 0;
 
   init(): void {
     this.sun = new Wireframe(new CircleGeometry(1, 64), { color: NeonColor.White, fillColor: NeonColor.White });
@@ -117,8 +126,30 @@ export class HomeView extends Object3D {
     });
   }
 
+  stopOrbiting(duration = 0.4): void {
+    this.orbitDecelerating = true;
+    this.orbitDecelDuration = duration;
+    this.orbitDecelElapsed = 0;
+  }
+
+  resumeOrbiting(): void {
+    this.orbitSpeed = BASE_ORBIT_SPEED;
+    this.orbitDecelerating = false;
+    this.orbitDecelElapsed = 0;
+  }
+
   update(): void {
-    this.planetAnchorRoot.rotateZ(-Math.PI/16 * App.deltaTime);
+    if (this.orbitDecelerating) {
+      this.orbitDecelElapsed += App.deltaTime;
+      const t = Math.min(1, this.orbitDecelElapsed / this.orbitDecelDuration);
+      this.orbitSpeed = BASE_ORBIT_SPEED * (1 - t);
+      if (t >= 1) {
+        this.orbitSpeed = 0;
+        this.orbitDecelerating = false;
+      }
+    }
+
+    this.planetAnchorRoot.rotateZ(this.orbitSpeed * App.deltaTime);
 
     this.planetList.forEach(planet => planet.update());
   }
