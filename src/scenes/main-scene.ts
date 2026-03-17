@@ -7,6 +7,7 @@ import Text, { TextAlignX, TextAlignY } from '@/objects/text';
 import { updateBehaviours } from '@/utils/scene-utils';
 import IntroAnimation from '@/view/intro-animation';
 import { MainView, setInputEnabled } from '@/view/main-view';
+import StarField from '@/view/star-field';
 
 export enum ProjectArea {
   College = 'college',
@@ -17,6 +18,7 @@ export enum ProjectArea {
 export default class MainScene extends Scene {
   titleText: Text;
 
+  starField: StarField;
   mainView: MainView;
   intro: IntroAnimation | null;
 
@@ -41,14 +43,18 @@ export default class MainScene extends Scene {
     this.titleText.position.z = 5;
     App.camera.attach(this.titleText);
 
+    this.starField = new StarField();
+    this.starField.position.z = -15;
+    App.camera.add(this.starField);
+
     this.intro = new IntroAnimation(
       this.titleText,
       this.mainView.sun,
       this.mainView.anchorList,
       this.mainView.planetList,
       this.mainView.planetAnchorRoot,
-      this.mainView.stars,
-      this.mainView.starIntroAlphas,
+      this.starField,
+      this.starField.introAlphas,
     );
 
     // window.addEventListener('click', this.onClick.bind(this));
@@ -92,6 +98,7 @@ export default class MainScene extends Scene {
       }
     }
 
+    this.starField.update();
     this.mainView.update();
 
     updateBehaviours(this);
