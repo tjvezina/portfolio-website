@@ -5,8 +5,8 @@ import App from '@/core/app';
 import { NeonColor } from '@/core/neon-color';
 import Text, { TextAlignX, TextAlignY } from '@/objects/text';
 import { updateBehaviours } from '@/utils/scene-utils';
+import { HomeView, setInputEnabled } from '@/view/home-view';
 import IntroAnimation from '@/view/intro-animation';
-import { MainView, setInputEnabled } from '@/view/main-view';
 import StarField from '@/view/star-field';
 
 export enum ProjectArea {
@@ -19,7 +19,7 @@ export default class MainScene extends Scene {
   titleText: Text;
 
   starField: StarField;
-  mainView: MainView;
+  homeView: HomeView;
   intro: IntroAnimation | null;
 
   init(): void {
@@ -33,9 +33,9 @@ export default class MainScene extends Scene {
     bloomEffect.mipmapBlurPass.radius = 0.2;
     App.effectComposer.addPass(new EffectPass(App.camera, bloomEffect));
 
-    this.mainView = new MainView();
-    this.mainView.init();
-    this.add(this.mainView);
+    this.homeView = new HomeView();
+    this.homeView.init();
+    this.add(this.homeView);
 
     this.titleText = new Text('Tyler J Vezina'.toUpperCase(), App.synthaFont, { color: NeonColor.Pink, size: 0.16 * App.pixelRatio, alignX: TextAlignX.Left, alignY: TextAlignY.Top });
     this.titleText.position.x = -5*Math.max(1, App.width/App.height) + 0.3;
@@ -49,10 +49,10 @@ export default class MainScene extends Scene {
 
     this.intro = new IntroAnimation(
       this.titleText,
-      this.mainView.sun,
-      this.mainView.anchorList,
-      this.mainView.planetList,
-      this.mainView.planetAnchorRoot,
+      this.homeView.sun,
+      this.homeView.anchorList,
+      this.homeView.planetList,
+      this.homeView.planetAnchorRoot,
       this.starField,
       this.starField.introAlphas,
     );
@@ -99,7 +99,7 @@ export default class MainScene extends Scene {
     }
 
     this.starField.update();
-    this.mainView.update();
+    this.homeView.update();
 
     updateBehaviours(this);
   }

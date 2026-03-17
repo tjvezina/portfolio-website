@@ -14,7 +14,7 @@ export function setInputEnabled(enabled: boolean): void {
   inputEnabled = enabled;
 }
 
-class Planet extends Object3D {
+export class Planet extends Object3D {
   area: ProjectArea;
   wireframe: Wireframe;
   anchor: Object3D;
@@ -70,7 +70,7 @@ class Planet extends Object3D {
   }
 }
 
-export class MainView extends Object3D {
+export class HomeView extends Object3D {
   sun: Wireframe;
 
   planetList: Planet[] = [];
