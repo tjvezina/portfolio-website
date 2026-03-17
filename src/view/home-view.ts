@@ -78,6 +78,8 @@ export class HomeView extends Object3D {
   planetAnchorRoot: Object3D;
   anchorList: Object3D[] = [];
 
+  onPlanetClicked: ((area: ProjectArea) => void) | null = null;
+
   init(): void {
     this.sun = new Wireframe(new CircleGeometry(1, 64), { color: NeonColor.White, fillColor: NeonColor.White });
 
@@ -103,6 +105,16 @@ export class HomeView extends Object3D {
     );
 
     this.add(this.sun, this.planetAnchorRoot, ...this.planetList);
+
+    window.addEventListener('click', () => {
+      if (!inputEnabled) return;
+      for (const planet of this.planetList) {
+        if (App.raycaster.intersectObject(planet, true).length > 0) {
+          this.onPlanetClicked?.(planet.area);
+          return;
+        }
+      }
+    });
   }
 
   update(): void {
