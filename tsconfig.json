@@ -13,5 +13,6 @@
       "@/*": ["./*"],
       "three/addons/*": ["../node_modules/@types/three/examples/jsm/*"],
     },
+    "types": ["webpack-env"],
   },
 }
