@@ -62,31 +62,7 @@ export default class MainScene extends Scene {
       this.starField.introAlphas.fill(1);
       this.viewManager.initializeAtRoute(initialRoute);
     }
-
-    // window.addEventListener('click', this.onClick.bind(this));
   }
-
-  // createHexGrid(): void {
-  //   new OBJLoader().load('./assets/models/hex-prism.obj', group => {
-  //     const hexPrism = createWireframe((group.children[0] as Mesh).geometry, { color: NeonColor.Pink });
-
-  //     const COUNT = 12;
-  //     for (let q = -COUNT; q <= COUNT; q++) {
-  //       for (let r = -COUNT; r <= COUNT; r++) {
-  //         if (Math.abs(-q-r) > COUNT) continue;
-
-  //         const hexObj = new Object3D().add(hexPrism.clone(true));
-  //         (hexObj.children[0] as Mesh).material = (hexPrism.material as Material).clone();
-  //         hexObj.position.x = 3/2 * r;
-  //         hexObj.position.y = Math.sqrt(3) * (q + r/2);
-  //         this.add(hexObj);
-  //         this.hexObjList.push(hexObj);
-  //       }
-  //     }
-  //   });
-  // }
-
-  // onClick(_event: MouseEvent): void { }
 
   onWindowResized(): void {
     this.titleText.position.x = -5*Math.max(1, App.width/App.height) + 0.3;

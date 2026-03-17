@@ -73,13 +73,13 @@ export default class ViewManager extends Object3D {
     } else if (route.type === 'project') {
       this.showProject(route.area, route.slug);
     }
-    console.log('ViewManager: route changed', route.type, direction);
   }
 
   showCategory(area: ProjectArea): void {
+    const color = CATEGORY_COLORS[area];
     let grid = this.categoryViews.get(area);
     if (!grid) {
-      grid = new CategoryGridView(area);
+      grid = new CategoryGridView(area, color);
       this.wireGridCallbacks(grid, area);
       this.categoryViews.set(area, grid);
       this.add(grid);
@@ -93,6 +93,7 @@ export default class ViewManager extends Object3D {
 
       // Position grid at planet location
       grid.position.set(planetPos.x, planetPos.y, 0);
+      grid.saveOriginalPosition();
 
       // Camera target: planet x,y but keep current z
       const cameraTarget = new Vector3(planetPos.x, planetPos.y, App.camera.position.z);
@@ -113,6 +114,7 @@ export default class ViewManager extends Object3D {
       const grid = this.categoryViews.get(this.activeCategory);
       if (grid) {
         grid.disableInput();
+        grid.resetPan();
         // Start reverse unfold; camera transition starts after it completes
         this.activeUnfold = new UnfoldTransition(grid, this.activeCategory, true, 0.8);
         this.pendingHomeTransition = true;
@@ -202,9 +204,10 @@ export default class ViewManager extends Object3D {
   }
 
   private showCategoryImmediate(area: ProjectArea): void {
+    const color = CATEGORY_COLORS[area];
     // Create and cache grid view
     if (!this.categoryViews.has(area)) {
-      const gridView = new CategoryGridView(area);
+      const gridView = new CategoryGridView(area, color);
       this.wireGridCallbacks(gridView, area);
       this.categoryViews.set(area, gridView);
       this.add(gridView);
@@ -218,6 +221,7 @@ export default class ViewManager extends Object3D {
 
     // Position grid at planet location, make visible
     gridView.position.set(targetPos.x, targetPos.y, 0);
+    gridView.saveOriginalPosition();
     gridView.visible = true;
     gridView.enableInput();
 

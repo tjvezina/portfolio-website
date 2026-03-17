@@ -42,7 +42,7 @@ export default class IntroAnimation {
   private starIntroAlphas: Float32Array;
   private starDistances: Float32Array;
   private maxStarDist: number;
-  private anchorTargets: { x: number; y: number }[];
+  private anchorTargets: { x: number, y: number }[];
 
   get isComplete(): boolean { return this._isComplete; }
   get inputReady(): boolean { return this.elapsed >= PLANETS_START + PLANETS_DURATION; }

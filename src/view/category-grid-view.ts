@@ -1,4 +1,4 @@
-import { Object3D, Vector2 } from 'three';
+import { Material, Mesh, Object3D, Vector2, Vector3 } from 'three';
 
 import App from '@/core/app';
 import { NeonColor } from '@/core/neon-color';
@@ -7,12 +7,6 @@ import { ProjectData } from '@/data/types';
 import { ProjectArea } from '@/scenes/main-scene';
 import GridCell from '@/view/grid/grid-cell';
 import { generateGridForCategory, GridLayout } from '@/view/grid/grid-geometry';
-
-const CATEGORY_COLORS: Record<ProjectArea, NeonColor> = {
-  [ProjectArea.College]: NeonColor.Orange,
-  [ProjectArea.Personal]: NeonColor.Green,
-  [ProjectArea.Career]: NeonColor.Cyan,
-};
 
 export default class CategoryGridView extends Object3D {
   area: ProjectArea;
@@ -23,18 +17,18 @@ export default class CategoryGridView extends Object3D {
   private isPanning = false;
   private panStart = new Vector2();
   private dragDistance = 0;
+  private originalPosition = new Vector3();
 
   private onPointerDown: (e: PointerEvent) => void;
   private onPointerMove: (e: PointerEvent) => void;
   private onPointerUp: (e: PointerEvent) => void;
   private onClick: (e: MouseEvent) => void;
 
-  constructor(area: ProjectArea) {
+  constructor(area: ProjectArea, color: NeonColor) {
     super();
     this.area = area;
 
     const data = getCategoryData(area);
-    const color = CATEGORY_COLORS[area];
     const cellSize = 1;
 
     this.layout = generateGridForCategory(area, data.projects.length, cellSize);
@@ -50,6 +44,16 @@ export default class CategoryGridView extends Object3D {
     this.onPointerMove = this.handlePointerMove.bind(this);
     this.onPointerUp = this.handlePointerUp.bind(this);
     this.onClick = this.handleClick.bind(this);
+  }
+
+  /** Store the current position as the original so resetPan can restore it. */
+  saveOriginalPosition(): void {
+    this.originalPosition.copy(this.position);
+  }
+
+  /** Reset position to the stored original, undoing any pan drift. */
+  resetPan(): void {
+    this.position.copy(this.originalPosition);
   }
 
   enableInput(): void {
@@ -107,6 +111,12 @@ export default class CategoryGridView extends Object3D {
       cell.prism.geometry.dispose();
       cell.prism.lineMaterial.dispose();
       cell.prism.fillMaterial?.dispose();
+      cell.label.traverse((obj) => {
+        if (obj instanceof Mesh) {
+          obj.geometry.dispose();
+          (obj.material as Material).dispose();
+        }
+      });
     }
   }
 }

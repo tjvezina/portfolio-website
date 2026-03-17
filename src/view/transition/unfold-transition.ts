@@ -12,13 +12,10 @@ export default class UnfoldTransition {
 
   get isComplete(): boolean { return this._isComplete; }
 
-  constructor(target: Object3D, area: ProjectArea, reverse: boolean, duration = 1.5) {
+  constructor(target: Object3D, _area: ProjectArea, reverse: boolean, duration = 1.5) {
     this.target = target;
     this.duration = duration;
     this.reverse = reverse;
-
-    // Suppress unused parameter lint — area will be used in real unfold
-    void area;
 
     if (!reverse) {
       this.target.visible = false;

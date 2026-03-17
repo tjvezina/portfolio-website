@@ -2,8 +2,8 @@ import { ProjectArea } from '@/scenes/main-scene';
 
 export type Route =
   | { type: 'home' }
-  | { type: 'category'; area: ProjectArea }
-  | { type: 'project'; area: ProjectArea; slug: string };
+  | { type: 'category', area: ProjectArea }
+  | { type: 'project', area: ProjectArea, slug: string };
 
 const VALID_CATEGORIES = new Set<string>([
   ProjectArea.College,

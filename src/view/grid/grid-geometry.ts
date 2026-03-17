@@ -11,7 +11,7 @@ export interface GridLayout {
 export function generateSquareGrid(count: number, cellSize: number): GridLayout {
   const positions: Vector2[] = [];
   positions.push(new Vector2(0, 0));
-  let x = 0, y = 0, dx = 1, dy = 0, steps = 1, stepsTaken = 0, turns = 0;
+  let x = 0; let y = 0; let dx = 1; let dy = 0; let steps = 1; let stepsTaken = 0; let turns = 0;
   while (positions.length < count) {
     x += dx;
     y += dy;
@@ -50,7 +50,7 @@ export function generateHexGrid(count: number, cellSize: number): GridLayout {
   positions.push(new Vector2(0, 0));
   let ring = 1;
   while (positions.length < count) {
-    let q = ring, r = 0;
+    let q = ring; let r = 0;
     const directions = [
       [-1, 1], [-1, 0], [0, -1],
       [1, -1], [1, 0], [0, 1],

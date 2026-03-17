@@ -1,5 +1,5 @@
-import { ProjectArea } from '@/scenes/main-scene';
 import { CategoryData, ProjectData } from '@/data/types';
+import { ProjectArea } from '@/scenes/main-scene';
 
 function loadCategory(context: __WebpackModuleApi.RequireContext): ProjectData[] {
   return context.keys().map((key) => {
