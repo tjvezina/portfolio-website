@@ -91,6 +91,7 @@ export default class MainScene extends Scene {
   onWindowResized(): void {
     this.titleText.position.x = -5*Math.max(1, App.width/App.height) + 0.3;
     this.titleText.position.y = 5*Math.max(1, App.height/App.width) - 0.3;
+    this.viewManager.onWindowResized();
   }
 
   update(): void {

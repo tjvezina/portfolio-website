@@ -5,6 +5,7 @@ import { NeonColor } from '@/core/neon-color';
 import { NavigationDirection, Route } from '@/core/router';
 import { getProjectData } from '@/data/loader';
 import { ProjectArea } from '@/scenes/main-scene';
+import BackButton from '@/view/back-button';
 import CategoryGridView from '@/view/category-grid-view';
 import GridCell from '@/view/grid/grid-cell';
 import { HomeView, setInputEnabled } from '@/view/home-view';
@@ -37,6 +38,9 @@ export default class ViewManager extends Object3D {
   private activeProjectCell: GridCell | null = null;
   private pendingProjectBack = false;
 
+  /** In-scene back navigation button */
+  private backButton: BackButton;
+
   constructor() {
     super();
 
@@ -47,6 +51,14 @@ export default class ViewManager extends Object3D {
     this.homeView.onPlanetClicked = (area: ProjectArea): void => {
       App.router.navigate({ type: 'category', area });
     };
+
+    this.backButton = new BackButton();
+    this.backButton.position.z = 5;
+    this.backButton.updatePosition();
+    this.backButton.onClick = (): void => {
+      window.history.back();
+    };
+    App.camera.add(this.backButton);
   }
 
   onRouteChanged(route: Route, direction: NavigationDirection): void {
@@ -92,9 +104,11 @@ export default class ViewManager extends Object3D {
 
     setInputEnabled(false);
     this.activeCategory = area;
+    this.backButton.enable();
   }
 
   showHome(): void {
+    this.backButton.disable();
     if (this.activeCategory) {
       const grid = this.categoryViews.get(this.activeCategory);
       if (grid) {
@@ -152,6 +166,9 @@ export default class ViewManager extends Object3D {
   }
 
   private hideProject(): void {
+    // Disable back button during transition to prevent double-navigation
+    this.backButton.disable();
+
     // Start reverse prism push
     if (this.activeProjectCell) {
       this.activePrismPush = new PrismPushTransition(this.activeProjectCell, true);
@@ -210,6 +227,7 @@ export default class ViewManager extends Object3D {
 
     setInputEnabled(false);
     this.activeCategory = area;
+    this.backButton.enable();
   }
 
   private showProjectImmediate(area: ProjectArea, slug: string): void {
@@ -232,6 +250,10 @@ export default class ViewManager extends Object3D {
 
     // Move camera to project page position (no animation)
     App.camera.position.z = App.camera.position.z - 5;
+  }
+
+  onWindowResized(): void {
+    this.backButton.updatePosition();
   }
 
   private startHomeCamera(): void {
@@ -282,6 +304,7 @@ export default class ViewManager extends Object3D {
             const grid = this.categoryViews.get(this.activeCategory);
             grid?.enableInput();
           }
+          this.backButton.enable();
         } else if (this.activeProjectView) {
           // Camera arrived at project — project page is now visible
           // Nothing extra needed; the view is already added to the scene
