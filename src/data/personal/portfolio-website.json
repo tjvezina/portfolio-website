@@ -1,0 +1,7 @@
+{
+  "slug": "portfolio-website",
+  "title": "Portfolio Website",
+  "description": "This website — a Three.js neon wireframe experience.",
+  "sourceUrl": "https://github.com/tylerjvezina/portfolio-website",
+  "tags": ["Three.js", "TypeScript", "WebGL"]
+}
