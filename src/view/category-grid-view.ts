@@ -3,8 +3,7 @@ import { Material, Mesh, Object3D, Vector2, Vector3 } from 'three';
 import App from '@/core/app';
 import { NeonColor } from '@/core/neon-color';
 import { getCategoryData } from '@/data/loader';
-import { ProjectData } from '@/data/types';
-import { ProjectArea } from '@/scenes/main-scene';
+import { ProjectArea, ProjectData } from '@/data/types';
 import GridCell from '@/view/grid/grid-cell';
 import { generateGridForCategory, GridLayout } from '@/view/grid/grid-geometry';
 

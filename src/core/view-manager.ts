@@ -4,7 +4,7 @@ import App from '@/core/app';
 import { NeonColor } from '@/core/neon-color';
 import { NavigationDirection, Route } from '@/core/router';
 import { getProjectData } from '@/data/loader';
-import { ProjectArea } from '@/scenes/main-scene';
+import { ProjectArea } from '@/data/types';
 import BackButton from '@/view/back-button';
 import CategoryGridView from '@/view/category-grid-view';
 import GridCell from '@/view/grid/grid-cell';

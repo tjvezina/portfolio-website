@@ -1,7 +1,7 @@
 import { Object3D } from 'three';
 
 import App from '@/core/app';
-import { ProjectArea } from '@/scenes/main-scene';
+import { ProjectArea } from '@/data/types';
 
 export default class UnfoldTransition {
   private elapsed = 0;

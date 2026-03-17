@@ -1,4 +1,4 @@
-import { ProjectArea } from '@/scenes/main-scene';
+import { ProjectArea } from '@/data/types';
 
 export type Route =
   | { type: 'home' }

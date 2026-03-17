@@ -1,6 +1,6 @@
 import { Vector2 } from 'three';
 
-import { ProjectArea } from '@/scenes/main-scene';
+import { ProjectArea } from '@/data/types';
 
 export interface GridLayout {
   positions: Vector2[];

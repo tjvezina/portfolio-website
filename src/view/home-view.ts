@@ -3,9 +3,9 @@ import { BoxGeometry, CircleGeometry, Color, IcosahedronGeometry, MathUtils, Obj
 import { Tumble } from '@/behaviours/tumble';
 import App from '@/core/app';
 import { NeonColor } from '@/core/neon-color';
+import { ProjectArea } from '@/data/types';
 import Text from '@/objects/text';
 import Wireframe from '@/objects/wireframe';
-import { ProjectArea } from '@/scenes/main-scene';
 import { addBehaviour } from '@/utils/scene-utils';
 
 let inputEnabled = false;

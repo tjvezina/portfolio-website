@@ -1,4 +1,8 @@
-import { ProjectArea } from '@/scenes/main-scene';
+export enum ProjectArea {
+  College = 'college',
+  Personal = 'personal',
+  Career = 'career',
+}
 
 export interface ProjectData {
   slug: string;

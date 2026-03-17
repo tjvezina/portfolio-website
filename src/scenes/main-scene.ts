@@ -9,12 +9,6 @@ import { updateBehaviours } from '@/utils/scene-utils';
 import IntroAnimation from '@/view/intro-animation';
 import StarField from '@/view/star-field';
 
-export enum ProjectArea {
-  College = 'college',
-  Personal = 'personal',
-  Career = 'career',
-}
-
 export default class MainScene extends Scene {
   titleText: Text;
 
