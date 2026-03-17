@@ -25,6 +25,10 @@ module.exports = {
       {
         test: /\.obj$/,
         type: 'asset/resource',
+      },
+      {
+        test: /\.(png|jpg|jpeg|gif|webp)$/,
+        type: 'asset/resource',
       }
     ],
   },
@@ -39,10 +43,6 @@ module.exports = {
     new HtmlWebpackPlugin({
       filename: 'index.html',
       template: 'index.html',
-    }),
-    new HtmlWebpackPlugin({
-      filename: '404.html',
-      template: '404.html',
     }),
     new CopyWebpackPlugin({
       patterns: [
