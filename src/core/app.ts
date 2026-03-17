@@ -3,6 +3,7 @@ import { Clock, Mesh, OrthographicCamera, Raycaster, Vector2, WebGLRenderer } fr
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial';
 import { Font, FontLoader } from 'three/examples/jsm/loaders/FontLoader';
 
+import Router, { NavigationDirection, Route } from '@/core/router';
 import MainScene from '@/scenes/main-scene';
 import { assert } from '@/utils/debug';
 import { findObjectsWhere } from '@/utils/scene-utils';
@@ -24,6 +25,7 @@ export default class App {
   static get deltaTime(): number { return App.#instance.deltaTime; }
 
   static get raycaster(): Raycaster { return App.#instance.raycaster; }
+  static get router(): Router { return App.#instance.router; }
 
   static get width(): number { return window.innerWidth; }
   static get height(): number { return window.innerHeight; }
@@ -48,6 +50,8 @@ export default class App {
   raycaster = new Raycaster();
   pointer = new Vector2();
 
+  router: Router;
+
   synthaFont: Font;
 
   constructor() {
@@ -68,7 +72,7 @@ export default class App {
     this.effectComposer = new EffectComposer(this.renderer);
     this.effectComposer.addPass(new RenderPass(this.scene, this.camera));
 
-    window.addEventListener('popstate', this.onWindowPopState.bind(this));
+    this.router = new Router(this.onRouteChanged.bind(this));
     window.addEventListener('resize', this.onWindowResized.bind(this));
     window.addEventListener('pointermove', this.onPointerMove.bind(this));
 
@@ -85,8 +89,8 @@ export default class App {
     });
   }
 
-  onWindowPopState(event: PopStateEvent): void {
-    console.log('popstate', event.state);
+  onRouteChanged(route: Route, direction: NavigationDirection): void {
+    console.log('Route changed:', route, direction);
   }
 
   onWindowResized(): void {
