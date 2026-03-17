@@ -30,20 +30,22 @@ Enforced by `.eslintrc` — key rules:
 
 ## Deployment
 
-- Pushes to `main` auto-deploy via GitHub Actions (`.github/workflows/build-and-deploy.yml`)
+- Hosted on Cloudflare Pages (auto-deploys on push to `main`)
+- Build command: `yarn build`, output: `dist/`
+- SPA routing: all paths serve `index.html`
 - Develop on the `dev` branch
 - `yarn build` uses `--mode production` (minified, tree-shaken); `yarn serve` uses the `development` mode from webpack.config.js
 
 ## DNS & Hosting
 
 - Domain registered with Squarespace Domains, nameservers pointed to Cloudflare
-- Cloudflare manages all DNS: A records for root domain → GitHub Pages IPs, tunnel CNAMEs for home server access
-- Cloudflare SSL/TLS mode: "Full" (not "strict" — GitHub Pages cert doesn't validate for custom domain through Cloudflare proxy)
-- Squarespace DNS records are inactive (still exist but nameservers bypass them)
+- Hosted on Cloudflare Pages — auto-deploys from GitHub repo
+- Cloudflare manages DNS and hosting in one place
+- Clean URL routing handled natively by Cloudflare Pages SPA mode
 
 ## Key Decisions
 
 - No test framework — solo visual project, manual verification only
-- SPA routing on GitHub Pages via `404.html` redirect trick
+- SPA routing via Cloudflare Pages (all paths serve `index.html`)
 - Browser-only target (`node: false` in ESLint env)
 - Viewer experience is the top priority — cross-device/browser compatibility matters
