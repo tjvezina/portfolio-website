@@ -1,5 +1,5 @@
-import { EffectComposer, RenderPass } from 'postprocessing';
-import { Clock, Mesh, OrthographicCamera, Raycaster, Vector2, WebGLRenderer } from 'three';
+import { EffectComposer, EffectPass, RenderPass } from 'postprocessing';
+import { Camera, Clock, Mesh, Object3D, OrthographicCamera, PerspectiveCamera, Raycaster, Vector2, WebGLRenderer } from 'three';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial';
 import { Font, FontLoader } from 'three/examples/jsm/loaders/FontLoader';
 
@@ -8,18 +8,24 @@ import MainScene from '@/scenes/main-scene';
 import { assert } from '@/utils/debug';
 import { findObjectsWhere } from '@/utils/scene-utils';
 
-const VIEW_WIDTH = 10;
-const VIEW_HEIGHT = 10;
+export const HOME_AREA_WIDTH = 10;
+export const HOME_AREA_HEIGHT = 10;
+export const PERSP_FOV = 75;
 
 export default class App {
   static #instance: App;
 
   static get isTouchscreen(): boolean { return typeof window.ontouchstart !== 'undefined'; }
 
-  static get camera(): OrthographicCamera { return App.#instance.camera; }
+  static get camera(): OrthographicCamera { return App.#instance.orthoCamera; }
+  static get activeCamera(): Camera { return App.#instance._activeCamera; }
+  static get cameraRig(): Object3D { return App.#instance.cameraRig; }
+  static get perspCamera(): PerspectiveCamera { return App.#instance.perspCamera; }
   static get scene(): MainScene { return App.#instance.scene; }
   static get renderer(): WebGLRenderer { return App.#instance.renderer; }
   static get effectComposer(): EffectComposer { return App.#instance.effectComposer; }
+  static get effectPass(): EffectPass | null { return App.#instance.effectPass; }
+  static set effectPass(pass: EffectPass | null) { App.#instance.effectPass = pass; }
 
   static get clock(): Clock { return App.#instance.clock; }
   static get deltaTime(): number { return App.#instance.deltaTime; }
@@ -39,7 +45,47 @@ export default class App {
     new App(); // eslint-disable-line no-new
   }
 
-  camera: OrthographicCamera;
+  /** Swap the active camera to perspective, matching the ortho view at the given world-z plane. */
+  static swapToPerspective(matchPlaneZ: number): void {
+    const app = App.#instance;
+    const ortho = app.orthoCamera;
+    const persp = app.perspCamera;
+
+    const orthoHeight = ortho.top - ortho.bottom;
+    const fovRad = persp.fov * Math.PI / 180;
+    const dist = orthoHeight / (2 * Math.tan(fovRad / 2));
+
+    // Position persp camera so its view at matchPlaneZ matches the ortho view
+    persp.position.set(0, 0, matchPlaneZ + dist - app.cameraRig.position.z);
+    persp.aspect = App.width / App.height;
+    persp.updateProjectionMatrix();
+
+    app._activeCamera = persp;
+    app.perspMatchPlaneZ = matchPlaneZ;
+    app.renderPass.mainCamera = persp;
+    if (app.effectPass) app.effectPass.mainCamera = persp;
+
+    // Move camera-attached UI to the match-plane distance so screen positions are preserved
+    app.scene.onCameraSwapped(matchPlaneZ - app.cameraRig.position.z);
+  }
+
+  /** Swap the active camera back to orthographic and restore UI positions. */
+  static swapToOrthographic(): void {
+    const app = App.#instance;
+    app._activeCamera = app.orthoCamera;
+    app.renderPass.mainCamera = app.orthoCamera;
+    if (app.effectPass) app.effectPass.mainCamera = app.orthoCamera;
+    app.scene.onCameraSwappedToOrtho();
+  }
+
+  orthoCamera: OrthographicCamera;
+  perspCamera: PerspectiveCamera;
+  cameraRig: Object3D;
+  private _activeCamera: Camera;
+  private renderPass: RenderPass;
+  effectPass: EffectPass | null = null;
+  private perspMatchPlaneZ = 0;
+
   scene: MainScene;
   renderer: WebGLRenderer;
   effectComposer: EffectComposer;
@@ -64,13 +110,24 @@ export default class App {
     document.body.appendChild(this.renderer.domElement);
 
     this.scene = new MainScene();
-    this.camera = new OrthographicCamera();
+
+    // Camera rig: shared parent for both cameras and camera-attached objects
+    this.cameraRig = new Object3D();
+    this.cameraRig.position.z = 10;
+    this.scene.add(this.cameraRig);
+
+    this.orthoCamera = new OrthographicCamera();
     this.updateCameraBounds();
-    this.camera.position.z = 10;
-    this.scene.add(this.camera);
+    this.cameraRig.add(this.orthoCamera);
+
+    this.perspCamera = new PerspectiveCamera(PERSP_FOV, App.width / App.height, 0.1, 100);
+    this.cameraRig.add(this.perspCamera);
+
+    this._activeCamera = this.orthoCamera;
 
     this.effectComposer = new EffectComposer(this.renderer);
-    this.effectComposer.addPass(new RenderPass(this.scene, this.camera));
+    this.renderPass = new RenderPass(this.scene, this._activeCamera);
+    this.effectComposer.addPass(this.renderPass);
 
     this.router = new Router(this.onRouteChanged.bind(this));
     window.addEventListener('resize', this.onWindowResized.bind(this));
@@ -97,6 +154,16 @@ export default class App {
     const { width, height, pixelRatio, lineWidth } = App;
 
     this.updateCameraBounds();
+    this.perspCamera.aspect = width / height;
+    this.perspCamera.updateProjectionMatrix();
+
+    // If perspective is active, recalculate its z to match the new ortho bounds
+    if (this._activeCamera === this.perspCamera) {
+      const orthoHeight = this.orthoCamera.top - this.orthoCamera.bottom;
+      const fovRad = this.perspCamera.fov * Math.PI / 180;
+      const dist = orthoHeight / (2 * Math.tan(fovRad / 2));
+      this.perspCamera.position.z = this.perspMatchPlaneZ + dist - this.cameraRig.position.z;
+    }
 
     this.renderer.setSize(width, height);
     this.renderer.setPixelRatio(pixelRatio);
@@ -119,9 +186,10 @@ export default class App {
   }
 
   updateCameraBounds(): void {
-    const { width, height, camera } = App;
+    const { width, height } = App;
+    const camera = this.orthoCamera;
 
-    const viewScale = (width/height < VIEW_WIDTH/VIEW_HEIGHT ? width/VIEW_WIDTH : height/VIEW_HEIGHT);
+    const viewScale = (width/height < HOME_AREA_WIDTH/HOME_AREA_HEIGHT ? width/HOME_AREA_WIDTH : height/HOME_AREA_HEIGHT);
 
     camera.left = -(width/2) / viewScale;
     camera.right = -camera.left;
@@ -134,7 +202,7 @@ export default class App {
   draw(): void {
     requestAnimationFrame(this.draw.bind(this));
 
-    this.raycaster.setFromCamera(this.pointer, App.camera);
+    this.raycaster.setFromCamera(this.pointer, App.activeCamera);
     this.deltaTime = this.clock.getDelta();
 
     this.scene.update();

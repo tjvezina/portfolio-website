@@ -1,4 +1,4 @@
-import { Object3D } from 'three';
+import { Mesh, MeshBasicMaterial, Object3D } from 'three';
 
 import App from '@/core/app';
 import { NeonColor } from '@/core/neon-color';
@@ -19,6 +19,16 @@ export default class BackButton extends Object3D {
       alignY: TextAlignY.Bottom,
     });
     this.add(this.text);
+
+    // Render on top of everything (never occluded by grids, etc.)
+    this.text.traverse(child => {
+      if (child instanceof Mesh) {
+        child.renderOrder = 999;
+        if (child.material instanceof MeshBasicMaterial) {
+          child.material.depthTest = false;
+        }
+      }
+    });
 
     this.visible = false;
 

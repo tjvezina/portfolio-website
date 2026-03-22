@@ -1,14 +1,38 @@
-import { BufferAttribute, BufferGeometry, Points, PointsMaterial } from 'three';
+import { BufferAttribute, BufferGeometry, Matrix4, OrthographicCamera, Points, ShaderMaterial } from 'three';
 
 import App from '@/core/app';
 
+const STAR_VERTEX = /* glsl */`
+  uniform mat4 uOrthoProjection;
+  uniform mat4 uOrthoView;
+
+  attribute vec3 color;
+  varying vec3 vColor;
+
+  void main() {
+    vColor = color;
+    gl_Position = uOrthoProjection * uOrthoView * modelMatrix * vec4(position, 1.0);
+    gl_PointSize = 1.0;
+  }
+`;
+
+const STAR_FRAGMENT = /* glsl */`
+  precision mediump float;
+  varying vec3 vColor;
+
+  void main() {
+    gl_FragColor = vec4(vColor, 1.0);
+  }
+`;
+
 export default class StarField extends Points {
   introAlphas: Float32Array;
+  private orthoCamera: OrthographicCamera;
   private baseColors: Float32Array;
   private twinkleSeeds: Float32Array;
   private twinkleSpeeds: Float32Array;
 
-  constructor() {
+  constructor(orthoCamera: OrthographicCamera) {
     let seed = 0x8BADF00D; // fixed seed
     const rand = (): number => {
       seed |= 0; seed = seed + 0x6D2B79F5 | 0;
@@ -71,14 +95,23 @@ export default class StarField extends Points {
     geometry.setAttribute('position', new BufferAttribute(positions, 3));
     geometry.setAttribute('color', new BufferAttribute(colors, 3));
 
-    const material = new PointsMaterial({
-      size: 1,
-      sizeAttenuation: false,
-      vertexColors: true,
+    const material = new ShaderMaterial({
+      uniforms: {
+        uOrthoProjection: { value: new Matrix4() },
+        uOrthoView: { value: new Matrix4() },
+      },
+      vertexShader: STAR_VERTEX,
+      fragmentShader: STAR_FRAGMENT,
+      depthWrite: false,
+      depthTest: false,
     });
 
     super(geometry, material);
 
+    // Render before everything else so scene content naturally covers stars
+    this.renderOrder = -1;
+
+    this.orthoCamera = orthoCamera;
     this.baseColors = new Float32Array(colors);
     this.twinkleSeeds = new Float32Array(starCount);
     this.twinkleSpeeds = new Float32Array(starCount);
@@ -117,5 +150,10 @@ export default class StarField extends Points {
 
     posAttr.needsUpdate = true;
     colAttr.needsUpdate = true;
+
+    // Update ortho projection uniforms so stars always render with orthographic projection
+    const mat = this.material as ShaderMaterial;
+    mat.uniforms.uOrthoProjection.value.copy(this.orthoCamera.projectionMatrix);
+    mat.uniforms.uOrthoView.value.copy(this.orthoCamera.matrixWorldInverse);
   }
 }

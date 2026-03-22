@@ -62,7 +62,7 @@ export class Planet extends Object3D {
 
     const pos = new Vector3();
     this.text.getWorldPosition(pos);
-    pos.z = App.camera.position.z;
+    pos.z = App.cameraRig.position.z;
     this.text.lookAt(pos);
 
     const s = MathUtils.smoothstep(this.glowStrength, 0, 1);
@@ -88,6 +88,10 @@ export class HomeView extends Object3D {
   private orbitDecelerating = false;
   private orbitDecelDuration = 0;
   private orbitDecelElapsed = 0;
+
+  private isRevealing = false;
+  private revealElapsed = 0;
+  private revealDuration = 0;
 
   init(): void {
     this.sun = new Wireframe(new CircleGeometry(1, 64), { color: NeonColor.White, fillColor: NeonColor.White });
@@ -126,16 +130,26 @@ export class HomeView extends Object3D {
     });
   }
 
-  stopOrbiting(duration = 0.4): void {
-    this.orbitDecelerating = true;
-    this.orbitDecelDuration = duration;
-    this.orbitDecelElapsed = 0;
+  stopOrbiting(): void {
+    this.orbitSpeed = 0;
+    this.orbitDecelerating = false;
   }
 
   resumeOrbiting(): void {
     this.orbitSpeed = BASE_ORBIT_SPEED;
     this.orbitDecelerating = false;
     this.orbitDecelElapsed = 0;
+  }
+
+  /** Scale all home elements from 0 → 1 over the given duration. */
+  reveal(duration: number): void {
+    this.sun.scale.setScalar(0);
+    for (const planet of this.planetList) {
+      planet.wireframe.scale.setScalar(0);
+    }
+    this.isRevealing = true;
+    this.revealElapsed = 0;
+    this.revealDuration = duration;
   }
 
   update(): void {
@@ -152,5 +166,17 @@ export class HomeView extends Object3D {
     this.planetAnchorRoot.rotateZ(this.orbitSpeed * App.deltaTime);
 
     this.planetList.forEach(planet => planet.update());
+
+    if (this.isRevealing) {
+      this.revealElapsed += App.deltaTime;
+      const t = Math.min(1, this.revealElapsed / this.revealDuration);
+      this.sun.scale.setScalar(t);
+      for (const planet of this.planetList) {
+        planet.wireframe.scale.setScalar(t);
+      }
+      if (t >= 1) {
+        this.isRevealing = false;
+      }
+    }
   }
 }

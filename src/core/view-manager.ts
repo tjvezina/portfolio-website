@@ -1,101 +1,32 @@
-import { BufferGeometry, Mesh, Object3D, Quaternion, Vector3 } from 'three';
+import { Object3D, Vector3 } from 'three';
 
-import App from '@/core/app';
+import App, { HOME_AREA_WIDTH } from '@/core/app';
 import { NeonColor } from '@/core/neon-color';
 import { NavigationDirection, Route } from '@/core/router';
 import { getProjectData } from '@/data/loader';
 import { ProjectArea } from '@/data/types';
-import Wireframe from '@/objects/wireframe';
 import BackButton from '@/view/back-button';
 import CategoryGridView from '@/view/category-grid-view';
 import GridCell from '@/view/grid/grid-cell';
-import { HomeView, Planet, setInputEnabled } from '@/view/home-view';
+import { HomeView, setInputEnabled } from '@/view/home-view';
 import ProjectPageView from '@/view/project-page-view';
 import CameraTransition from '@/view/transition/camera-transition';
+import PlanetFocusTransition from '@/view/transition/planet-focus-transition';
 import PrismPushTransition from '@/view/transition/prism-push-transition';
-import UnfoldTransition from '@/view/transition/unfold-transition';
 
 export { setInputEnabled };
 
-const CAMERA_FORWARD = new Vector3(0, 0, 1);
+const GRID_COLS = 4.75;
 
-/**
- * Extract unique face normals from a BufferGeometry.
- */
-function getFaceNormals(geometry: BufferGeometry): Vector3[] {
-  const positions = geometry.getAttribute('position');
-  const index = geometry.getIndex();
-  const normals: Vector3[] = [];
-  const seen = new Set<string>();
+const PHI = (1 + Math.sqrt(5)) / 2;
 
-  const v0 = new Vector3();
-  const v1 = new Vector3();
-  const v2 = new Vector3();
-  const edge1 = new Vector3();
-  const edge2 = new Vector3();
-  const normal = new Vector3();
-
-  const faceCount = index ? index.count / 3 : positions.count / 3;
-
-  for (let i = 0; i < faceCount; i++) {
-    const i0 = index ? index.getX(i * 3) : i * 3;
-    const i1 = index ? index.getX(i * 3 + 1) : i * 3 + 1;
-    const i2 = index ? index.getX(i * 3 + 2) : i * 3 + 2;
-
-    v0.fromBufferAttribute(positions, i0);
-    v1.fromBufferAttribute(positions, i1);
-    v2.fromBufferAttribute(positions, i2);
-
-    edge1.subVectors(v1, v0);
-    edge2.subVectors(v2, v0);
-    normal.crossVectors(edge1, edge2).normalize();
-
-    const key = `${normal.x.toFixed(3)},${normal.y.toFixed(3)},${normal.z.toFixed(3)}`;
-    if (!seen.has(key)) {
-      seen.add(key);
-      normals.push(normal.clone());
-    }
-  }
-
-  return normals;
-}
-
-/**
- * Compute a target quaternion that aligns the nearest face toward a direction.
- */
-function computeFaceAlignTarget(
-  currentQuat: Quaternion,
-  faceNormals: Vector3[],
-  targetDir: Vector3,
-): Quaternion {
-  let bestNormal = faceNormals[0];
-  let bestDot = -Infinity;
-
-  for (const fn of faceNormals) {
-    const worldNormal = fn.clone().applyQuaternion(currentQuat);
-    const dot = worldNormal.dot(targetDir);
-    if (dot > bestDot) {
-      bestDot = dot;
-      bestNormal = fn;
-    }
-  }
-
-  const currentDir = bestNormal.clone().applyQuaternion(currentQuat);
-  const correction = new Quaternion().setFromUnitVectors(currentDir, targetDir);
-  return correction.multiply(currentQuat.clone());
-}
-
-/**
- * Get the source BufferGeometry from a Wireframe's fill mesh child.
- */
-function getSourceGeometry(wireframe: Wireframe): BufferGeometry | null {
-  for (const child of wireframe.children) {
-    if (child instanceof Mesh) {
-      return child.geometry as BufferGeometry;
-    }
-  }
-  return null;
-}
+// World-space edge length of each planet's faces, used to size grid cells.
+// Career (icosahedron → hex) cell size is TBD — using icosahedron edge as placeholder.
+const PLANET_EDGE_SIZE: Record<ProjectArea, number> = {
+  [ProjectArea.College]: 0.9,
+  [ProjectArea.Personal]: 0.75 * Math.SQRT2,
+  [ProjectArea.Career]: 0.75 * 2 / Math.sqrt(1 + PHI * PHI),
+};
 
 const CATEGORY_COLORS: Record<ProjectArea, NeonColor> = {
   [ProjectArea.College]: NeonColor.Orange,
@@ -107,11 +38,15 @@ export default class ViewManager extends Object3D {
   homeView: HomeView;
   categoryViews: Map<ProjectArea, CategoryGridView> = new Map();
   activeTransition: CameraTransition | null = null;
-  activeUnfold: UnfoldTransition | null = null;
   activeCategory: ProjectArea | null = null;
 
-  /** When navigating home, we run unfold-reverse first, then camera. */
-  private pendingHomeTransition = false;
+  /** Planet focus transition for home → category (must run after homeView.update). */
+  private activePlanetFocus: PlanetFocusTransition | null = null;
+
+  /** Navigation queuing — holds routes received during active transitions. */
+  private busy = false;
+  private transitionTarget: Route | null = null;
+  private pendingRoutes: { route: Route, direction: NavigationDirection }[] = [];
 
   /** Project page state */
   private activeProjectView: ProjectPageView | null = null;
@@ -121,6 +56,7 @@ export default class ViewManager extends Object3D {
 
   /** In-scene back navigation button */
   private backButton: BackButton;
+  private backButtonOriginalZ: number;
 
   constructor() {
     super();
@@ -135,14 +71,23 @@ export default class ViewManager extends Object3D {
 
     this.backButton = new BackButton();
     this.backButton.position.z = 5;
+    this.backButtonOriginalZ = this.backButton.position.z;
     this.backButton.updatePosition();
     this.backButton.onClick = (): void => {
       window.history.back();
     };
-    App.camera.add(this.backButton);
+    App.cameraRig.add(this.backButton);
   }
 
   onRouteChanged(route: Route, direction: NavigationDirection): void {
+    if (this.busy) {
+      this.enqueuePendingRoute(route, direction);
+      return;
+    }
+    this.executeRoute(route, direction);
+  }
+
+  private executeRoute(route: Route, direction: NavigationDirection): void {
     if (route.type === 'category') {
       if (direction === 'back' && this.activeProjectView) {
         this.hideProject();
@@ -156,7 +101,53 @@ export default class ViewManager extends Object3D {
     }
   }
 
+  /**
+   * Push a route onto the pending queue.  If the new route matches the state
+   * we'd be in without the last queued entry, the two cancel out (back+forward).
+   */
+  private enqueuePendingRoute(route: Route, direction: NavigationDirection): void {
+    const q = this.pendingRoutes;
+    if (q.length > 0) {
+      const stateBeforeLast = q.length >= 2
+        ? q[q.length - 2].route
+        : this.transitionTarget!;
+      if (this.routesMatch(route, stateBeforeLast)) {
+        q.pop();
+        return;
+      }
+    }
+    q.push({ route, direction });
+  }
+
+  private routesMatch(a: Route, b: Route): boolean {
+    if (a.type !== b.type) return false;
+    if (a.type === 'category' && b.type === 'category') return a.area === b.area;
+    if (a.type === 'project' && b.type === 'project') return a.area === b.area && a.slug === b.slug;
+    return true;
+  }
+
+  private routeMatchesCurrent(route: Route): boolean {
+    if (route.type === 'home') return this.activeCategory === null;
+    if (route.type === 'category') return this.activeCategory === route.area && !this.activeProjectView;
+    if (route.type === 'project') return !!this.activeProjectView;
+    return false;
+  }
+
+  /** Clear busy flag and execute the next pending route, if any. */
+  private settle(): void {
+    this.busy = false;
+    while (this.pendingRoutes.length > 0) {
+      const { route, direction } = this.pendingRoutes.shift()!;
+      if (!this.routeMatchesCurrent(route)) {
+        this.executeRoute(route, direction);
+        return;
+      }
+    }
+  }
+
   showCategory(area: ProjectArea): void {
+    this.busy = true;
+    this.transitionTarget = { type: 'category', area };
     const color = CATEGORY_COLORS[area];
     let grid = this.categoryViews.get(area);
     if (!grid) {
@@ -166,28 +157,24 @@ export default class ViewManager extends Object3D {
       this.add(grid);
     }
 
-    // Stop all orbital motion so the camera target is stable
+    // Stop all orbital motion instantly so the planet position is stable
     this.homeView.stopOrbiting();
 
-    // Get planet world position for camera target
     const planet = this.homeView.planetList.find(p => p.area === area);
     if (planet) {
-      const planetPos = new Vector3();
-      planet.wireframe.getWorldPosition(planetPos);
-
-      // Position grid at planet location
-      grid.position.set(planetPos.x, planetPos.y, 0);
+      // Grid will be centered at the origin (where the planet flies to)
+      grid.position.set(0, 0, 0);
       grid.saveOriginalPosition();
 
-      // Camera target: planet x,y but keep current z
-      const cameraTarget = new Vector3(planetPos.x, planetPos.y, App.camera.position.z);
-      this.activeTransition = new CameraTransition(cameraTarget, 1.2);
-
-      // Decelerate tumble and align a face toward the camera
-      this.startTumbleDecel(planet);
+      // Planet flies to screen center and scales up to fill the grid area
+      const targetScale = (HOME_AREA_WIDTH / GRID_COLS) / PLANET_EDGE_SIZE[area];
+      const otherPlanets = this.homeView.planetList.filter(p => p.area !== area);
+      this.activePlanetFocus = new PlanetFocusTransition(
+        planet, otherPlanets, this.homeView.sun, targetScale, 1.2,
+      );
     }
 
-    // Grid starts hidden; unfold will reveal it after camera transition completes
+    // Grid starts hidden; unfold will reveal it after focus transition completes
     grid.visible = false;
 
     setInputEnabled(false);
@@ -197,51 +184,47 @@ export default class ViewManager extends Object3D {
 
   showHome(): void {
     this.backButton.disable();
+    setInputEnabled(false);
+
     if (this.activeCategory) {
-      const grid = this.categoryViews.get(this.activeCategory);
+      this.busy = true;
+      this.transitionTarget = { type: 'home' };
+      const area = this.activeCategory;
+      const grid = this.categoryViews.get(area);
       if (grid) {
         grid.disableInput();
         grid.resetPan();
-        // Start reverse unfold; camera transition starts after it completes
-        this.activeUnfold = new UnfoldTransition(grid, this.activeCategory, true, 0.8);
-        this.pendingHomeTransition = true;
-      }
 
-      // Resume tumble on the planet that was stopped
-      const planet = this.homeView.planetList.find(p => p.area === this.activeCategory);
-      if (planet) {
-        planet.tumble.resume();
+        const cellSize = HOME_AREA_WIDTH / GRID_COLS;
+        grid.startReverseFold(cellSize, () => {
+          grid.removeCenterSquare();
+          grid.visible = false;
+          grid.scale.setScalar(1);
+
+          // Swap back to orthographic camera
+          App.swapToOrthographic();
+
+          // Show home view — planet positions will be overridden by reverse focus
+          this.homeView.visible = true;
+          const planet = this.homeView.planetList.find(p => p.area === area);
+          if (planet) planet.wireframe.visible = true;
+
+          // Start reverse planet focus transition
+          if (planet) {
+            planet.tumble.resume();
+            const targetScale = (HOME_AREA_WIDTH / GRID_COLS) / PLANET_EDGE_SIZE[area];
+            const otherPlanets = this.homeView.planetList.filter(p => p.area !== area);
+            this.activePlanetFocus = new PlanetFocusTransition(
+              planet, otherPlanets, this.homeView.sun, targetScale, 1.2, true,
+            );
+          }
+        });
       }
     }
-
-    // Resume orbital motion
-    this.homeView.resumeOrbiting();
-
-    setInputEnabled(false);
-  }
-
-  private startTumbleDecel(planet: Planet): void {
-    const geometry = getSourceGeometry(planet.wireframe);
-    if (!geometry) return;
-
-    const faceNormals = getFaceNormals(geometry);
-    const alignTarget = computeFaceAlignTarget(
-      planet.wireframe.quaternion,
-      faceNormals,
-      CAMERA_FORWARD,
-    );
-
-    // Decelerate over 0.8s, then align to face over 0.4s
-    planet.tumble.decelerateAndAlign(0.8, alignTarget, 0.4);
   }
 
   private wireGridCallbacks(grid: CategoryGridView, area: ProjectArea): void {
     grid.onProjectClicked = (project): void => {
-      // Find the clicked cell to pass to the transition
-      const cell = grid.cells.find(c => c.project === project);
-      if (cell) {
-        this.activeProjectCell = cell;
-      }
       App.router.navigate({ type: 'project', area, slug: project.slug });
     };
   }
@@ -249,6 +232,8 @@ export default class ViewManager extends Object3D {
   private showProject(area: ProjectArea, slug: string): void {
     const project = getProjectData(area, slug);
     if (!project) return;
+    this.busy = true;
+    this.transitionTarget = { type: 'project', area, slug };
 
     const color = CATEGORY_COLORS[area];
 
@@ -271,14 +256,16 @@ export default class ViewManager extends Object3D {
 
     // Move camera forward through the grid
     const cameraTarget = new Vector3(
-      App.camera.position.x,
-      App.camera.position.y,
-      App.camera.position.z - 5,
+      App.cameraRig.position.x,
+      App.cameraRig.position.y,
+      App.cameraRig.position.z - 5,
     );
     this.activeTransition = new CameraTransition(cameraTarget, 1.0);
   }
 
   private hideProject(): void {
+    this.busy = true;
+    this.transitionTarget = { type: 'category', area: this.activeCategory! };
     // Disable back button during transition to prevent double-navigation
     this.backButton.disable();
 
@@ -289,9 +276,9 @@ export default class ViewManager extends Object3D {
 
     // Move camera back to grid plane
     const cameraTarget = new Vector3(
-      App.camera.position.x,
-      App.camera.position.y,
-      App.camera.position.z + 5,
+      App.cameraRig.position.x,
+      App.cameraRig.position.y,
+      App.cameraRig.position.z + 5,
     );
     this.activeTransition = new CameraTransition(cameraTarget, 1.0);
     this.pendingProjectBack = true;
@@ -325,20 +312,11 @@ export default class ViewManager extends Object3D {
     }
     const gridView = this.categoryViews.get(area)!;
 
-    // Get planet world position
-    const planet = this.homeView.planetList.find((p) => p.area === area)!;
-    const targetPos = new Vector3();
-    planet.wireframe.getWorldPosition(targetPos);
-
-    // Position grid at planet location, make visible
-    gridView.position.set(targetPos.x, targetPos.y, 0);
+    // Grid at origin (no camera movement in this strategy)
+    gridView.position.set(0, 0, 0);
     gridView.saveOriginalPosition();
     gridView.visible = true;
     gridView.enableInput();
-
-    // Position camera directly at grid (no animation)
-    App.camera.position.x = targetPos.x;
-    App.camera.position.y = targetPos.y;
 
     setInputEnabled(false);
     this.activeCategory = area;
@@ -364,18 +342,19 @@ export default class ViewManager extends Object3D {
     this.activeProjectView = projectView;
 
     // Move camera to project page position (no animation)
-    App.camera.position.z = App.camera.position.z - 5;
+    App.cameraRig.position.z = App.cameraRig.position.z - 5;
+  }
+
+  onCameraSwapped(matchPlaneLocalZ: number): void {
+    this.backButton.position.z = matchPlaneLocalZ;
+  }
+
+  onCameraSwappedToOrtho(): void {
+    this.backButton.position.z = this.backButtonOriginalZ;
   }
 
   onWindowResized(): void {
     this.backButton.updatePosition();
-  }
-
-  private startHomeCamera(): void {
-    const cameraTarget = new Vector3(0, 0, App.camera.position.z);
-    this.activeTransition = new CameraTransition(cameraTarget, 1.2);
-    this.pendingHomeTransition = false;
-    this.activeCategory = null;
   }
 
   update(): void {
@@ -387,21 +366,8 @@ export default class ViewManager extends Object3D {
       }
     }
 
-    // Sequence: camera transition first, then unfold (for forward navigation)
-    // For back navigation: unfold reverse first, then camera
-    if (this.activeUnfold) {
-      this.activeUnfold.update();
-      if (this.activeUnfold.isComplete) {
-        this.activeUnfold = null;
-        if (this.pendingHomeTransition) {
-          this.startHomeCamera();
-        } else if (this.activeCategory) {
-          // Forward unfold complete — enable grid input
-          const grid = this.categoryViews.get(this.activeCategory);
-          grid?.enableInput();
-        }
-      }
-    } else if (this.activeTransition) {
+    // Camera transitions (used for project view navigation)
+    if (this.activeTransition) {
       this.activeTransition.update();
       if (this.activeTransition.isComplete) {
         this.activeTransition = null;
@@ -420,22 +386,57 @@ export default class ViewManager extends Object3D {
             grid?.enableInput();
           }
           this.backButton.enable();
+          this.settle();
         } else if (this.activeProjectView) {
-          // Camera arrived at project — project page is now visible
-          // Nothing extra needed; the view is already added to the scene
-        } else if (this.activeCategory) {
-          // Camera arrived at category — start unfold
-          const grid = this.categoryViews.get(this.activeCategory);
-          if (grid) {
-            this.activeUnfold = new UnfoldTransition(grid, this.activeCategory, false);
-          }
+          // Camera arrived at project
+          this.settle();
         } else {
           // Camera returned home
           setInputEnabled(true);
+          this.settle();
         }
       }
     }
 
     this.homeView.update();
+
+    // Drive cross-unfold animation on the active category grid
+    if (this.activeCategory) {
+      this.categoryViews.get(this.activeCategory)?.update();
+    }
+
+    // Must run after homeView.update() so wireframe position overrides take effect.
+    if (this.activePlanetFocus) {
+      this.activePlanetFocus.update();
+      if (this.activePlanetFocus.isComplete) {
+        if (this.activePlanetFocus.reverse) {
+          // Reverse focus complete — restore home state
+          this.homeView.resumeOrbiting();
+          this.activePlanetFocus = null;
+          this.activeCategory = null;
+          setInputEnabled(true);
+          this.settle();
+        } else if (this.activeCategory) {
+          const grid = this.categoryViews.get(this.activeCategory);
+          if (grid && !grid.visible) {
+            // Hide all home view objects — the grid takes over from here
+            this.homeView.visible = false;
+
+            // Switch to perspective camera — the grid face is flat and coplanar,
+            // so matching the ortho view at z=0 makes the swap imperceptible.
+            App.swapToPerspective(0);
+
+            grid.showInitialFace(HOME_AREA_WIDTH / GRID_COLS);
+            grid.visible = true;
+            // Unfold outward wave by wave; enable input when all waves complete
+            grid.startCrossUnfold(HOME_AREA_WIDTH / GRID_COLS, () => {
+              grid.enableInput();
+              this.settle();
+            });
+            this.activePlanetFocus = null;
+          }
+        }
+      }
+    }
   }
 }

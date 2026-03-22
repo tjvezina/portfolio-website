@@ -34,6 +34,8 @@ export class Tumble extends Behaviour {
   quaternion: Quaternion;
   config: TumbleConfig;
 
+  private frozen = false;
+
   // Deceleration state
   private decelerating = false;
   private decelDuration = 0;
@@ -68,8 +70,16 @@ export class Tumble extends Behaviour {
     this.aligning = false;
   }
 
-  /** Resume normal tumbling after having been stopped. */
+  /** Freeze rotation in place — holds current quaternion, ignores all further input. */
+  freeze(): void {
+    this.frozen = true;
+    this.decelerating = false;
+    this.aligning = false;
+  }
+
+  /** Resume normal tumbling after having been stopped or frozen. */
   resume(): void {
+    this.frozen = false;
     this.decelerating = false;
     this.aligning = false;
     this.alignStart = null;
@@ -78,6 +88,7 @@ export class Tumble extends Behaviour {
   }
 
   update(): void {
+    if (this.frozen) return;
     const dt = App.deltaTime;
 
     // Phase 2: Slerp to face-aligned orientation
