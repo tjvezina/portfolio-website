@@ -178,4 +178,4 @@ From the repo root:
 yarn editor
 ```
 
-This runs `cd editor && npx vite`, which starts the Vite dev server with the middleware plugin. The editor opens in the browser at `http://localhost:5173` (Vite's default port).
+This runs `cd editor && yarn dev`, which starts the Vite dev server with the middleware plugin. The editor opens in the browser at `http://localhost:5173` (Vite's default port).
