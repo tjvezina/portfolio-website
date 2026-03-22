@@ -17,11 +17,32 @@ body {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  padding: 16px;
 }
 
-.app h1 {
-  font-size: 1.4rem;
-  margin-bottom: 16px;
+.app-header {
+  padding: 12px 20px;
+  border-bottom: 1px solid #2a2a4a;
+  background: #12122a;
+}
+
+.app-header h1 {
+  font-size: 1.2rem;
   color: #7c83ff;
+}
+
+.app-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.form-panel {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+}
+
+.placeholder {
+  color: #666;
+  font-size: 0.9rem;
 }

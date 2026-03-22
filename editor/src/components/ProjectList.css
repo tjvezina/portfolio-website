@@ -1,0 +1,77 @@
+.project-list {
+  display: flex;
+  flex-direction: column;
+  width: 260px;
+  min-width: 260px;
+  border-right: 1px solid #2a2a4a;
+  background: #16162a;
+  overflow: hidden;
+}
+
+.category-tabs {
+  display: flex;
+  border-bottom: 1px solid #2a2a4a;
+}
+
+.category-tabs .tab {
+  flex: 1;
+  padding: 10px 8px;
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 0.8rem;
+  text-transform: capitalize;
+  cursor: pointer;
+}
+
+.category-tabs .tab.active {
+  color: #7c83ff;
+  border-bottom: 2px solid #7c83ff;
+}
+
+.projects {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+.project-item {
+  display: block;
+  width: 100%;
+  padding: 10px 16px;
+  background: none;
+  border: none;
+  color: #ccc;
+  text-align: left;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.project-item:hover {
+  background: #1e1e3a;
+}
+
+.project-item.active {
+  background: #2a2a4a;
+  color: #7c83ff;
+}
+
+.empty {
+  padding: 16px;
+  color: #666;
+  font-size: 0.85rem;
+}
+
+.new-project-btn {
+  padding: 12px;
+  background: #2a2a4a;
+  border: none;
+  border-top: 1px solid #2a2a4a;
+  color: #7c83ff;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.new-project-btn:hover {
+  background: #33335a;
+}
