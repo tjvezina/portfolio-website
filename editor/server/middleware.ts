@@ -28,8 +28,8 @@ function sendError(res: import('http').ServerResponse, status: number, message: 
 
 function parseBody(req: import('http').IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    req.on('data', (chunk: Buffer) => chunks.push(chunk));
+    const chunks: Uint8Array[] = [];
+    req.on('data', (chunk: Uint8Array) => chunks.push(chunk));
     req.on('end', () => resolve(Buffer.concat(chunks).toString()));
     req.on('error', reject);
   });
@@ -47,8 +47,8 @@ function parseMultipart(req: import('http').IncomingMessage): Promise<ParsedUplo
     if (!boundaryMatch) return reject(new Error('No boundary in content-type'));
     const boundary = boundaryMatch[1];
 
-    const chunks: Buffer[] = [];
-    req.on('data', (chunk: Buffer) => chunks.push(chunk));
+    const chunks: Uint8Array[] = [];
+    req.on('data', (chunk: Uint8Array) => chunks.push(chunk));
     req.on('error', reject);
     req.on('end', () => {
       const buffer = Buffer.concat(chunks);
@@ -163,7 +163,7 @@ export default function editorApiPlugin(): Plugin {
           }
 
           const destPath = path.join(assetDir, filename);
-          fs.writeFileSync(destPath, upload.file.data);
+          fs.writeFileSync(destPath, new Uint8Array(upload.file.data));
           const relativePath = `assets/projects/${category}/${slug}/${filename}`;
           return sendJson(res, 200, { path: relativePath });
         }
@@ -201,7 +201,7 @@ export default function editorApiPlugin(): Plugin {
           let body: Record<string, unknown>;
           try { body = JSON.parse(await parseBody(req)); }
           catch { return sendError(res, 400, 'Invalid JSON body'); }
-          const newSlug = body.slug ?? slug;
+          const newSlug = (body.slug as string) ?? slug;
 
           // Handle slug rename
           if (newSlug !== slug) {
@@ -216,8 +216,10 @@ export default function editorApiPlugin(): Plugin {
               // Rewrite image paths in the JSON body
               const oldPrefix = `assets/projects/${category}/${slug}/`;
               const newPrefix = `assets/projects/${category}/${newSlug}/`;
-              if (body.thumbnail) body.thumbnail = body.thumbnail.replace(oldPrefix, newPrefix);
-              if (body.screenshots) {
+              if (typeof body.thumbnail === 'string') {
+                body.thumbnail = body.thumbnail.replace(oldPrefix, newPrefix);
+              }
+              if (Array.isArray(body.screenshots)) {
                 body.screenshots = body.screenshots.map((s: string) =>
                   s.replace(oldPrefix, newPrefix),
                 );
