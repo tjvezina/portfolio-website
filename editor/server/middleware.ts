@@ -35,6 +35,56 @@ function parseBody(req: import('http').IncomingMessage): Promise<string> {
   });
 }
 
+interface ParsedUpload {
+  fields: Record<string, string>;
+  file?: { name: string; data: Buffer };
+}
+
+function parseMultipart(req: import('http').IncomingMessage): Promise<ParsedUpload> {
+  return new Promise((resolve, reject) => {
+    const contentType = req.headers['content-type'] ?? '';
+    const boundaryMatch = contentType.match(/boundary=(.+)/);
+    if (!boundaryMatch) return reject(new Error('No boundary in content-type'));
+    const boundary = boundaryMatch[1];
+
+    const chunks: Buffer[] = [];
+    req.on('data', (chunk: Buffer) => chunks.push(chunk));
+    req.on('error', reject);
+    req.on('end', () => {
+      const buffer = Buffer.concat(chunks);
+      const parts = buffer
+        .toString('binary')
+        .split(`--${boundary}`)
+        .filter((p) => p.trim() && p.trim() !== '--');
+
+      const result: ParsedUpload = { fields: {} };
+
+      for (const part of parts) {
+        const headerEnd = part.indexOf('\r\n\r\n');
+        if (headerEnd === -1) continue;
+        const headers = part.slice(0, headerEnd);
+        const body = part.slice(headerEnd + 4, part.endsWith('\r\n') ? part.length - 2 : part.length);
+
+        const nameMatch = headers.match(/name="([^"]+)"/);
+        if (!nameMatch) continue;
+        const name = nameMatch[1];
+
+        const filenameMatch = headers.match(/filename="([^"]+)"/);
+        if (filenameMatch) {
+          result.file = {
+            name: filenameMatch[1],
+            data: Buffer.from(body, 'binary'),
+          };
+        } else {
+          result.fields[name] = body.trim();
+        }
+      }
+
+      resolve(result);
+    });
+  });
+}
+
 export default function editorApiPlugin(): Plugin {
   return {
     name: 'editor-api',
@@ -71,6 +121,50 @@ export default function editorApiPlugin(): Plugin {
             projects: readProjectsInCategory(area),
           }));
           return sendJson(res, 200, result);
+        }
+
+        // POST /api/images/import
+        if (req.method === 'POST' && url === '/api/images/import') {
+          const upload = await parseMultipart(req);
+          const { category, slug, type } = upload.fields;
+
+          if (!category || !slug || !type) {
+            return sendError(res, 400, 'category, slug, and type are required');
+          }
+          if (!CATEGORIES.includes(category as typeof CATEGORIES[number])) {
+            return sendError(res, 400, `Invalid category: ${category}`);
+          }
+          if (type !== 'thumbnail' && type !== 'screenshot') {
+            return sendError(res, 400, 'type must be "thumbnail" or "screenshot"');
+          }
+          if (!upload.file) {
+            return sendError(res, 400, 'No file uploaded');
+          }
+
+          const ext = path.extname(upload.file.name).toLowerCase();
+          const assetDir = path.join(ASSETS_DIR, 'projects', category, slug);
+          fs.mkdirSync(assetDir, { recursive: true });
+
+          let filename: string;
+          if (type === 'thumbnail') {
+            // Remove any existing thumbnail with a different extension
+            const existing = fs.readdirSync(assetDir).filter((f) => f.startsWith('thumbnail.'));
+            for (const f of existing) fs.unlinkSync(path.join(assetDir, f));
+            filename = `thumbnail${ext}`;
+          } else {
+            // Find next screenshot number
+            const existing = fs.readdirSync(assetDir).filter((f) => f.startsWith('screenshot-'));
+            const numbers = existing
+              .map((f) => parseInt(f.match(/screenshot-(\d+)/)?.[1] ?? '0', 10))
+              .filter((n) => !isNaN(n));
+            const next = numbers.length > 0 ? Math.max(...numbers) + 1 : 1;
+            filename = `screenshot-${next}${ext}`;
+          }
+
+          const destPath = path.join(assetDir, filename);
+          fs.writeFileSync(destPath, upload.file.data);
+          const relativePath = `assets/projects/${category}/${slug}/${filename}`;
+          return sendJson(res, 200, { path: relativePath });
         }
 
         // Route matching for /api/categories/:category/projects[/:slug]
