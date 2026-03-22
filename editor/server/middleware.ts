@@ -99,7 +99,8 @@ export default function editorApiPlugin(): Plugin {
 
       server.middlewares.use('/assets', (req, res, next) => {
         // Serve static files from repo-root assets/ for image previews
-        const filePath = path.join(ASSETS_DIR, req.url ?? '');
+        const filePath = path.resolve(ASSETS_DIR, (req.url ?? '').replace(/^\/+/, ''));
+        if (!filePath.startsWith(ASSETS_DIR)) return next();
         if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
           const ext = path.extname(filePath).toLowerCase();
           const contentType = mimeTypes[ext] ?? 'application/octet-stream';

@@ -65,8 +65,8 @@ export default function App(): React.ReactElement {
                   isNew: false,
                 }));
               }}
-              onDeleted={() => {
-                loadCategories();
+              onDeleted={async () => {
+                await loadCategories();
                 setSelection((prev) => ({ ...prev, slug: null, isNew: false }));
               }}
             />

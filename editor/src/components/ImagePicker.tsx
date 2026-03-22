@@ -27,8 +27,12 @@ export default function ImagePicker({
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>): Promise<void> {
     const file = e.target.files?.[0];
     if (!file) return;
-    const path = await importImage(category, slug, type, file);
-    onImported(path);
+    try {
+      const path = await importImage(category, slug, type, file);
+      onImported(path);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Image import failed');
+    }
     // Reset input so re-selecting the same file triggers onChange
     if (inputRef.current) inputRef.current.value = '';
   }
