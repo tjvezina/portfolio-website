@@ -179,8 +179,13 @@ export default function editorApiPlugin(): Plugin {
 
         // POST /api/categories/:category/projects
         if (req.method === 'POST' && !slug) {
-          const body = JSON.parse(await parseBody(req));
+          let body: Record<string, unknown>;
+          try { body = JSON.parse(await parseBody(req)); }
+          catch { return sendError(res, 400, 'Invalid JSON body'); }
           if (!body.slug) return sendError(res, 400, 'slug is required');
+          if (!/^[a-z0-9-]+$/.test(body.slug as string)) {
+            return sendError(res, 400, 'slug must contain only lowercase letters, digits, and hyphens');
+          }
           const filePath = path.join(categoryDir, `${body.slug}.json`);
           if (fs.existsSync(filePath)) return sendError(res, 409, 'Project already exists');
           fs.mkdirSync(categoryDir, { recursive: true });
@@ -192,7 +197,9 @@ export default function editorApiPlugin(): Plugin {
         if (req.method === 'PUT' && slug) {
           const filePath = path.join(categoryDir, `${slug}.json`);
           if (!fs.existsSync(filePath)) return sendError(res, 404, 'Project not found');
-          const body = JSON.parse(await parseBody(req));
+          let body: Record<string, unknown>;
+          try { body = JSON.parse(await parseBody(req)); }
+          catch { return sendError(res, 400, 'Invalid JSON body'); }
           const newSlug = body.slug ?? slug;
 
           // Handle slug rename
