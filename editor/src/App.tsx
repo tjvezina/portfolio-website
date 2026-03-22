@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import type { CategoryData, ProjectData } from './api';
 import { fetchCategories } from './api';
+import ProjectForm from './components/ProjectForm';
 import ProjectList from './components/ProjectList';
 
 interface Selection {
@@ -52,9 +53,21 @@ export default function App(): React.ReactElement {
           }
         />
         <div className="form-panel">
-          {selection.isNew && <p>New project form (coming in next task)</p>}
-          {!selection.isNew && selectedProject && (
-            <p>Edit: {selectedProject.title} (form coming in next task)</p>
+          {(selection.isNew || selectedProject) && (
+            <ProjectForm
+              category={selection.category}
+              project={selection.isNew ? null : selectedProject!}
+              onSaved={() => {
+                loadCategories();
+                if (selection.isNew) {
+                  setSelection((prev) => ({ ...prev, isNew: false }));
+                }
+              }}
+              onDeleted={() => {
+                loadCategories();
+                setSelection((prev) => ({ ...prev, slug: null, isNew: false }));
+              }}
+            />
           )}
           {!selection.isNew && !selectedProject && (
             <p className="placeholder">Select a project or create a new one.</p>
