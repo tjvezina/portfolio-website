@@ -57,11 +57,13 @@ export default function App(): React.ReactElement {
             <ProjectForm
               category={selection.category}
               project={selection.isNew ? null : selectedProject!}
-              onSaved={() => {
-                loadCategories();
-                if (selection.isNew) {
-                  setSelection((prev) => ({ ...prev, isNew: false }));
-                }
+              onSaved={async (savedSlug) => {
+                await loadCategories();
+                setSelection((prev) => ({
+                  ...prev,
+                  slug: savedSlug,
+                  isNew: false,
+                }));
               }}
               onDeleted={() => {
                 loadCategories();

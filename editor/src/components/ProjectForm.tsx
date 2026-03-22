@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react';
 
 import type { ProjectData } from '../api';
 import { createProject, deleteProject, updateProject } from '../api';
+import ImagePicker from './ImagePicker';
 import './ProjectForm.css';
 
 interface ProjectFormProps {
   category: string;
   project: ProjectData | null; // null = new project
-  onSaved: () => void;
+  onSaved: (slug: string) => void;
   onDeleted: () => void;
 }
 
@@ -94,7 +95,7 @@ export default function ProjectForm({
       } else {
         await updateProject(category, project!.slug, cleaned);
       }
-      onSaved();
+      onSaved(cleaned.slug);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Save failed');
     } finally {
@@ -193,7 +194,54 @@ export default function ProjectForm({
         />
       </label>
 
-      {/* Thumbnail and Screenshots will be added in Task 8 */}
+      {!isNew && (
+        <>
+          <ImagePicker
+            label="Thumbnail"
+            category={category}
+            slug={form.slug}
+            type="thumbnail"
+            currentPath={form.thumbnail}
+            onImported={(path) => updateField('thumbnail', path)}
+            onRemove={() => updateField('thumbnail', '')}
+          />
+
+          <div className="image-picker">
+            <span className="image-picker-label">Screenshots</span>
+            <div className="screenshots-list">
+              {(form.screenshots ?? []).map((path, i) => (
+                <div key={path} className="image-preview-container">
+                  <img className="image-preview" src={`/${path}`} alt={`Screenshot ${i + 1}`} />
+                  <button
+                    className="image-remove-btn"
+                    onClick={() =>
+                      updateField(
+                        'screenshots',
+                        (form.screenshots ?? []).filter((_, j) => j !== i),
+                      )
+                    }
+                    title="Remove"
+                  >
+                    &times;
+                  </button>
+                </div>
+              ))}
+            </div>
+            <ImagePicker
+              label=""
+              category={category}
+              slug={form.slug}
+              type="screenshot"
+              onImported={(path) =>
+                updateField('screenshots', [...(form.screenshots ?? []), path])
+              }
+            />
+          </div>
+        </>
+      )}
+      {isNew && (
+        <p className="image-hint">Save the project first, then add images.</p>
+      )}
 
       <div className="form-actions">
         <button className="save-btn" onClick={handleSave} disabled={saving}>
