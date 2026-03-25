@@ -4,7 +4,7 @@
 
 .project-form h2 {
   font-size: 1.1rem;
-  color: #7c83ff;
+  color: #d4a86a;
   margin-bottom: 20px;
 }
 
@@ -12,21 +12,21 @@
   display: block;
   margin-bottom: 16px;
   font-size: 0.85rem;
-  color: #999;
+  color: #888;
 }
 
 .project-form input[type="text"],
 .project-form input[type="url"],
-.project-form input[type="date"],
+.project-form input[type="number"],
 .project-form textarea {
   display: block;
   width: 100%;
   margin-top: 4px;
   padding: 8px 10px;
-  background: #12122a;
-  border: 1px solid #2a2a4a;
+  background: #121214;
+  border: 1px solid #2a2a2e;
   border-radius: 4px;
-  color: #e0e0e0;
+  color: #c8c8cc;
   font-size: 0.9rem;
   font-family: inherit;
 }
@@ -34,7 +34,7 @@
 .project-form input:focus,
 .project-form textarea:focus {
   outline: none;
-  border-color: #7c83ff;
+  border-color: #c0965a;
 }
 
 .project-form textarea {
@@ -42,9 +42,9 @@
 }
 
 .form-error {
-  background: #3a1a1a;
-  border: 1px solid #ff4444;
-  color: #ff6666;
+  background: #2a1a1a;
+  border: 1px solid #aa3333;
+  color: #dd6666;
   padding: 8px 12px;
   border-radius: 4px;
   margin-bottom: 16px;
@@ -59,16 +59,17 @@
 
 .save-btn {
   padding: 8px 24px;
-  background: #7c83ff;
+  background: #b8923e;
   border: none;
   border-radius: 4px;
-  color: #fff;
+  color: #1a1a1e;
   font-size: 0.9rem;
   cursor: pointer;
+  font-weight: 500;
 }
 
 .save-btn:hover {
-  background: #6b72ee;
+  background: #d4a86a;
 }
 
 .save-btn:disabled {
@@ -79,19 +80,19 @@
 .delete-btn {
   padding: 8px 24px;
   background: none;
-  border: 1px solid #ff4444;
+  border: 1px solid #aa3333;
   border-radius: 4px;
-  color: #ff4444;
+  color: #cc4444;
   font-size: 0.9rem;
   cursor: pointer;
 }
 
 .delete-btn:hover {
-  background: #3a1a1a;
+  background: #2a1a1a;
 }
 
 .image-hint {
-  color: #666;
+  color: #555;
   font-size: 0.85rem;
   font-style: italic;
   margin-top: 8px;

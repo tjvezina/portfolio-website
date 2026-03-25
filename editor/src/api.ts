@@ -9,7 +9,7 @@ export interface ProjectData {
   playUrl?: string;
   sourceUrl?: string;
   tags?: string[];
-  date?: string;
+  year?: number;
 }
 
 export interface CategoryData {
@@ -56,6 +56,18 @@ export async function updateProject(
 export async function deleteProject(category: string, slug: string): Promise<void> {
   const res = await fetch(`/api/categories/${category}/projects/${slug}`, {
     method: 'DELETE',
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error ?? res.statusText);
+  }
+}
+
+export async function reorderProjects(category: string, slugs: string[]): Promise<void> {
+  const res = await fetch(`/api/categories/${category}/order`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(slugs),
   });
   if (!res.ok) {
     const err = await res.json();

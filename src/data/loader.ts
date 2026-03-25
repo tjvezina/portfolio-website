@@ -1,11 +1,38 @@
 import { CategoryData, ProjectArea, ProjectData } from '@/data/types';
 
-function loadCategory(context: __WebpackModuleApi.RequireContext): ProjectData[] {
-  return context.keys().map((key) => {
-    const mod = context(key);
-    // webpack may wrap JSON as { default: ... } or return directly — handle both
-    return (mod.default ?? mod) as ProjectData;
-  });
+function loadCategory(
+  context: __WebpackModuleApi.RequireContext,
+  orderContext: __WebpackModuleApi.RequireContext,
+  orderKey: string,
+): ProjectData[] {
+  const projects = context.keys()
+    .filter((key) => key !== './order.json')
+    .map((key) => {
+      const mod = context(key);
+      // webpack may wrap JSON as { default: ... } or return directly — handle both
+      return (mod.default ?? mod) as ProjectData;
+    });
+
+  let order: string[] = [];
+  try {
+    const mod = orderContext(orderKey);
+    order = (mod.default ?? mod) as string[];
+  } catch {
+    // No order.json — return in discovery order
+  }
+
+  if (order.length === 0) return projects;
+  const indexed = new Map(projects.map((p) => [p.slug, p]));
+  const sorted: ProjectData[] = [];
+  for (const slug of order) {
+    const p = indexed.get(slug);
+    if (p) {
+      sorted.push(p);
+      indexed.delete(slug);
+    }
+  }
+  for (const p of indexed.values()) sorted.push(p);
+  return sorted;
 }
 
 const collegeContext = require.context('./college', false, /\.json$/);
@@ -13,9 +40,9 @@ const personalContext = require.context('./personal', false, /\.json$/);
 const careerContext = require.context('./career', false, /\.json$/);
 
 const categories: Map<ProjectArea, CategoryData> = new Map([
-  [ProjectArea.College, { area: ProjectArea.College, projects: loadCategory(collegeContext) }],
-  [ProjectArea.Personal, { area: ProjectArea.Personal, projects: loadCategory(personalContext) }],
-  [ProjectArea.Career, { area: ProjectArea.Career, projects: loadCategory(careerContext) }],
+  [ProjectArea.College, { area: ProjectArea.College, projects: loadCategory(collegeContext, collegeContext, './order.json') }],
+  [ProjectArea.Personal, { area: ProjectArea.Personal, projects: loadCategory(personalContext, personalContext, './order.json') }],
+  [ProjectArea.Career, { area: ProjectArea.Career, projects: loadCategory(careerContext, careerContext, './order.json') }],
 ]);
 
 export function getCategoryData(area: ProjectArea): CategoryData {

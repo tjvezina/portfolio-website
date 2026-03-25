@@ -9,12 +9,42 @@ const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const DATA_DIR = path.join(REPO_ROOT, 'src', 'data');
 const ASSETS_DIR = path.join(REPO_ROOT, 'assets');
 
+function orderFilePath(category: string): string {
+  return path.join(DATA_DIR, category, 'order.json');
+}
+
+function readOrder(category: string): string[] {
+  const p = orderFilePath(category);
+  if (!fs.existsSync(p)) return [];
+  try { return JSON.parse(fs.readFileSync(p, 'utf-8')); }
+  catch { return []; }
+}
+
+function writeOrder(category: string, order: string[]): void {
+  const dir = path.join(DATA_DIR, category);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(orderFilePath(category), JSON.stringify(order, null, 2) + '\n');
+}
+
 function readProjectsInCategory(category: string): object[] {
   const dir = path.join(DATA_DIR, category);
   if (!fs.existsSync(dir)) return [];
-  return fs.readdirSync(dir)
-    .filter((f) => f.endsWith('.json'))
+  const projects = fs.readdirSync(dir)
+    .filter((f) => f.endsWith('.json') && f !== 'order.json')
     .map((f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf-8')));
+  const order = readOrder(category);
+  const indexed = new Map(projects.map((p: Record<string, unknown>) => [p.slug, p]));
+  const sorted: object[] = [];
+  for (const slug of order) {
+    const p = indexed.get(slug);
+    if (p) {
+      sorted.push(p);
+      indexed.delete(slug);
+    }
+  }
+  // Append any projects not listed in order.json
+  for (const p of indexed.values()) sorted.push(p);
+  return sorted;
 }
 
 function sendJson(res: import('http').ServerResponse, status: number, data: unknown): void {
@@ -124,6 +154,17 @@ export default function editorApiPlugin(): Plugin {
           return sendJson(res, 200, result);
         }
 
+        // PUT /api/categories/:category/order
+        const orderMatch = url.match(/^\/api\/categories\/(college|personal|career)\/order$/);
+        if (req.method === 'PUT' && orderMatch) {
+          let body: string[];
+          try { body = JSON.parse(await parseBody(req)); }
+          catch { return sendError(res, 400, 'Invalid JSON body'); }
+          if (!Array.isArray(body)) return sendError(res, 400, 'Body must be an array of slugs');
+          writeOrder(orderMatch[1], body);
+          return sendJson(res, 200, { ok: true });
+        }
+
         // POST /api/images/import
         if (req.method === 'POST' && url === '/api/images/import') {
           const upload = await parseMultipart(req);
@@ -191,6 +232,9 @@ export default function editorApiPlugin(): Plugin {
           if (fs.existsSync(filePath)) return sendError(res, 409, 'Project already exists');
           fs.mkdirSync(categoryDir, { recursive: true });
           fs.writeFileSync(filePath, JSON.stringify(body, null, 2) + '\n');
+          const order = readOrder(category);
+          order.push(body.slug as string);
+          writeOrder(category, order);
           return sendJson(res, 201, body);
         }
 
@@ -227,6 +271,10 @@ export default function editorApiPlugin(): Plugin {
             }
 
             fs.unlinkSync(filePath);
+            const order = readOrder(category);
+            const idx = order.indexOf(slug);
+            if (idx !== -1) order[idx] = newSlug;
+            writeOrder(category, order);
           }
 
           const targetPath = path.join(categoryDir, `${newSlug}.json`);
@@ -239,6 +287,8 @@ export default function editorApiPlugin(): Plugin {
           const filePath = path.join(categoryDir, `${slug}.json`);
           if (!fs.existsSync(filePath)) return sendError(res, 404, 'Project not found');
           fs.unlinkSync(filePath);
+          const order = readOrder(category);
+          writeOrder(category, order.filter((s) => s !== slug));
 
           // Remove asset directory if it exists
           const assetDir = path.join(ASSETS_DIR, 'projects', category, slug);

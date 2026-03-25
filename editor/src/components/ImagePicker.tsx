@@ -9,7 +9,9 @@ interface ImagePickerProps {
   slug: string;
   type: 'thumbnail' | 'screenshot';
   currentPath?: string;
+  multiple?: boolean;
   onImported: (path: string) => void;
+  onMultipleImported?: (paths: string[]) => void;
   onRemove?: () => void;
 }
 
@@ -19,17 +21,25 @@ export default function ImagePicker({
   slug,
   type,
   currentPath,
+  multiple,
   onImported,
+  onMultipleImported,
   onRemove,
 }: ImagePickerProps): React.ReactElement {
   const inputRef = useRef<HTMLInputElement>(null);
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>): Promise<void> {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
     try {
-      const path = await importImage(category, slug, type, file);
-      onImported(path);
+      const paths = await Promise.all(
+        files.map((file) => importImage(category, slug, type, file)),
+      );
+      if (onMultipleImported) {
+        onMultipleImported(paths);
+      } else {
+        for (const path of paths) onImported(path);
+      }
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Image import failed');
     }
@@ -58,6 +68,7 @@ export default function ImagePicker({
         ref={inputRef}
         type="file"
         accept="image/*"
+        multiple={multiple}
         onChange={handleFileChange}
         style={{ display: 'none' }}
       />

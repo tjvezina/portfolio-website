@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import type { CategoryData, ProjectData } from './api';
-import { fetchCategories } from './api';
+import { fetchCategories, reorderProjects } from './api';
 import ProjectForm from './components/ProjectForm';
 import ProjectList from './components/ProjectList';
 
@@ -51,6 +51,10 @@ export default function App(): React.ReactElement {
           onNewProject={() =>
             setSelection((prev) => ({ ...prev, slug: null, isNew: true }))
           }
+          onReorder={async (category, slugs) => {
+            await reorderProjects(category, slugs);
+            await loadCategories();
+          }}
         />
         <div className="form-panel">
           {(selection.isNew || selectedProject) && (

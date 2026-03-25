@@ -3,14 +3,14 @@
   flex-direction: column;
   width: 260px;
   min-width: 260px;
-  border-right: 1px solid #2a2a4a;
-  background: #16162a;
+  border-right: 1px solid #2a2a2e;
+  background: #161618;
   overflow: hidden;
 }
 
 .category-tabs {
   display: flex;
-  border-bottom: 1px solid #2a2a4a;
+  border-bottom: 1px solid #2a2a2e;
 }
 
 .category-tabs .tab {
@@ -18,15 +18,15 @@
   padding: 10px 8px;
   background: none;
   border: none;
-  color: #888;
+  color: #777;
   font-size: 0.8rem;
   text-transform: capitalize;
   cursor: pointer;
 }
 
 .category-tabs .tab.active {
-  color: #7c83ff;
-  border-bottom: 2px solid #7c83ff;
+  color: #d4a86a;
+  border-bottom: 2px solid #d4a86a;
 }
 
 .projects {
@@ -36,42 +36,81 @@
 }
 
 .project-item {
-  display: block;
+  display: flex;
+  align-items: center;
   width: 100%;
-  padding: 10px 16px;
   background: none;
-  border: none;
-  color: #ccc;
-  text-align: left;
-  cursor: pointer;
-  font-size: 0.9rem;
+  transition: background 0.1s;
 }
 
 .project-item:hover {
-  background: #1e1e3a;
+  background: #1e1e22;
 }
 
 .project-item.active {
-  background: #2a2a4a;
-  color: #7c83ff;
+  background: #2a2a2e;
+}
+
+.project-item.dragging {
+  opacity: 0.4;
+}
+
+.project-item.drop-target {
+  border-top: 2px solid #d4a86a;
+}
+
+.drag-handle {
+  padding: 0 10px 0 4px;
+  color: #3a3a3e;
+  cursor: grab;
+  font-size: 1.1rem;
+  user-select: none;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.project-item:hover .drag-handle {
+  color: #555;
+}
+
+.project-item-label {
+  flex: 1;
+  padding: 10px 6px 10px 16px;
+  background: none;
+  border: none;
+  color: #999;
+  text-align: left;
+  cursor: pointer;
+  font-size: 0.9rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-item.active .project-item-label {
+  color: #d4a86a;
 }
 
 .empty {
   padding: 16px;
-  color: #666;
+  color: #555;
   font-size: 0.85rem;
 }
 
 .new-project-btn {
   padding: 12px;
-  background: #2a2a4a;
+  background: #1e1e22;
   border: none;
-  border-top: 1px solid #2a2a4a;
-  color: #7c83ff;
+  border-top: 1px solid #2a2a2e;
+  color: #c0965a;
   cursor: pointer;
   font-size: 0.9rem;
 }
 
 .new-project-btn:hover {
-  background: #33335a;
+  background: #2a2a2e;
+  color: #d4a86a;
 }

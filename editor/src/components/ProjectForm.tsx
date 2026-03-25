@@ -30,7 +30,7 @@ export default function ProjectForm({
     slug: '',
     title: '',
     description: '',
-    date: '',
+    year: undefined,
     tags: [],
     playUrl: '',
     sourceUrl: '',
@@ -50,7 +50,7 @@ export default function ProjectForm({
         slug: '',
         title: '',
         description: '',
-        date: '',
+        year: undefined,
         tags: [],
         playUrl: '',
         sourceUrl: '',
@@ -83,7 +83,7 @@ export default function ProjectForm({
       // Strip empty optional fields before saving
       const cleaned: ProjectData = { slug: form.slug, title: form.title };
       if (form.description) cleaned.description = form.description;
-      if (form.date) cleaned.date = form.date;
+      if (form.year) cleaned.year = form.year;
       if (form.tags && form.tags.length > 0) cleaned.tags = form.tags;
       if (form.playUrl) cleaned.playUrl = form.playUrl;
       if (form.sourceUrl) cleaned.sourceUrl = form.sourceUrl;
@@ -151,11 +151,11 @@ export default function ProjectForm({
       </label>
 
       <label>
-        Date
+        Year
         <input
-          type="date"
-          value={form.date ?? ''}
-          onChange={(e) => updateField('date', e.target.value)}
+          type="number"
+          value={form.year ?? ''}
+          onChange={(e) => updateField('year', e.target.value ? Number(e.target.value) : undefined)}
         />
       </label>
 
@@ -232,8 +232,10 @@ export default function ProjectForm({
               category={category}
               slug={form.slug}
               type="screenshot"
-              onImported={(path) =>
-                updateField('screenshots', [...(form.screenshots ?? []), path])
+              multiple
+              onImported={() => {}}
+              onMultipleImported={(paths) =>
+                updateField('screenshots', [...(form.screenshots ?? []), ...paths])
               }
             />
           </div>
