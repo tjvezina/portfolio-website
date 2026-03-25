@@ -1,5 +1,5 @@
 import { BloomEffect, EffectPass } from 'postprocessing';
-import { Mesh, MeshBasicMaterial, Scene } from 'three';
+import { AdditiveBlending, Mesh, MeshBasicMaterial, Scene } from 'three';
 
 import App from '@/core/app';
 import { NeonColor } from '@/core/neon-color';
@@ -41,6 +41,8 @@ export default class MainScene extends Scene {
     // @ts-ignore : Type definitions are incomplete
     bloomEffect.mipmapBlurPass.radius = 0.2;
     const effectPass = new EffectPass(App.activeCamera, bloomEffect);
+    effectPass.fullscreenMaterial.transparent = true;
+    effectPass.fullscreenMaterial.blending = AdditiveBlending;
     App.effectComposer.addPass(effectPass);
     App.effectPass = effectPass;
 

@@ -2,6 +2,7 @@ import { Color, Mesh, MeshBasicMaterial, Object3D, ShapeGeometry, Vector3 } from
 import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry';
 import { Font } from 'three/examples/jsm/loaders/FontLoader';
 
+import { BLOOM_LAYER } from '@/core/layers';
 import { NeonColor } from '@/core/neon-color';
 import { assert } from '@/utils/debug';
 
@@ -22,6 +23,7 @@ export type TextOptions = {
   size?: number,
   alignX?: TextAlignX,
   alignY?: TextAlignY,
+  bloom?: boolean,
 }
 
 export default class Text extends Object3D {
@@ -31,6 +33,7 @@ export default class Text extends Object3D {
     const alignX = options?.alignX ?? TextAlignX.Center;
     const alignY = options?.alignY ?? TextAlignY.Center;
     const color = options?.color ?? NeonColor.White;
+    const bloom = options?.bloom ?? true;
 
     const textGeometry = new TextGeometry(text, {
       font,
@@ -46,7 +49,11 @@ export default class Text extends Object3D {
     textGeometry.boundingBox?.getCenter(textCenter);
 
     assert(Array.isArray(textGeometry.parameters.shapes), 'Expected shape array in TextGeometry');
-    const letters = textGeometry.parameters.shapes.map(shape => new Mesh(new ShapeGeometry(shape), new MeshBasicMaterial({ color })));
+    const letters = textGeometry.parameters.shapes.map(shape => {
+      const mesh = new Mesh(new ShapeGeometry(shape), new MeshBasicMaterial({ color }));
+      if (bloom) mesh.layers.set(BLOOM_LAYER);
+      return mesh;
+    });
     for (const letter of letters) {
       const letterCenter = new Vector3();
       letter.geometry.computeBoundingBox();

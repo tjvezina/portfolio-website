@@ -12,12 +12,28 @@ Personal portfolio site built with Three.js, TypeScript, and webpack. Hosted on 
 ## Architecture
 
 - **Entry:** `src/index.ts` → `App` singleton (`src/core/app.ts`) manages renderer, camera, scene, and frame loop
-- **Rendering:** Orthographic camera, wireframe aesthetic with bloom post-processing (`postprocessing` library)
+- **Rendering:** Orthographic camera, wireframe aesthetic with selective bloom (see Rendering Pipeline below)
 - **Scenes/Views:** `scenes/` for Three.js Scenes, `view/` for visual compositions within a scene
 - **Objects:** Reusable 3D object classes in `objects/` (Text, Wireframe, WireframeText, ShatterIcosa)
 - **Behaviours:** Frame-updated components attached via `Object3D.userData.behaviours` — see `behaviours/behaviour.ts` base class
 - **Utilities:** `utils/` for helpers (assertions, scene traversal)
 - **Path alias:** `@/*` maps to `src/*` (configured in both tsconfig and webpack)
+
+## Rendering Pipeline
+
+Two-pass selective bloom so image assets (thumbnails) render clean while wireframes get neon glow:
+
+1. **Clean pass** (layer 0): Thumbnails, visible fills, stars — rendered directly via `renderer.render()`
+2. **Bloom pass** (`BLOOM_LAYER`): Wireframe lines, text, black fills — rendered via `EffectComposer` with `BloomEffect`, composited on top using **additive blending**
+
+**Why additive blending:** Alpha compositing failed because the `postprocessing` bloom shader outputs alpha=1 everywhere, making the bloom pass fully opaque. Additive sidesteps this — black adds nothing, bloom glow adds on top.
+
+**Fill mesh strategy** (`Wireframe` class creates three meshes):
+- Wireframe line segments → `BLOOM_LAYER` only
+- Visible fill (black/colored) → layer 0 (rendered in clean pass)
+- Black fill → `BLOOM_LAYER` at `renderOrder: -1` (occludes stars and backface edges within the bloom pass; black contributes nothing in additive composite)
+
+**Stars** render in the bloom pass at `renderOrder: -2` (before fills), so black fills correctly cover them where geometry exists.
 
 ## Code Style
 

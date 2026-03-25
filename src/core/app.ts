@@ -3,6 +3,7 @@ import { Camera, Clock, Mesh, Object3D, OrthographicCamera, PerspectiveCamera, R
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial';
 import { Font, FontLoader } from 'three/examples/jsm/loaders/FontLoader';
 
+import { BLOOM_LAYER } from '@/core/layers';
 import Router, { NavigationDirection, Route } from '@/core/router';
 import MainScene from '@/scenes/main-scene';
 import { assert } from '@/utils/debug';
@@ -216,6 +217,14 @@ export default class App {
 
     this.scene.update();
 
+    // Pass 1: Render non-bloom objects (thumbnails, visible fills)
+    this._activeCamera.layers.set(0);
+    this.renderer.render(this.scene, this._activeCamera);
+
+    // Pass 2: Render bloom objects on top (additive — black adds nothing, glow adds color)
+    this._activeCamera.layers.set(BLOOM_LAYER);
+    this.renderer.autoClear = false;
     this.effectComposer.render();
+    this.renderer.autoClear = true;
   }
 }

@@ -1,6 +1,7 @@
 import { BufferAttribute, BufferGeometry, Matrix4, OrthographicCamera, Points, ShaderMaterial } from 'three';
 
 import App from '@/core/app';
+import { BLOOM_LAYER } from '@/core/layers';
 
 const STAR_VERTEX = /* glsl */`
   uniform mat4 uOrthoProjection;
@@ -108,8 +109,10 @@ export default class StarField extends Points {
 
     super(geometry, material);
 
-    // Render before everything else so scene content naturally covers stars
-    this.renderOrder = -1;
+    this.layers.set(BLOOM_LAYER);
+
+    // Render before fills so black fills can occlude stars within the bloom pass
+    this.renderOrder = -2;
 
     this.orthoCamera = orthoCamera;
     this.baseColors = new Float32Array(colors);
