@@ -31,6 +31,7 @@ export default class App {
   static get deltaTime(): number { return App.#instance.deltaTime; }
 
   static get raycaster(): Raycaster { return App.#instance.raycaster; }
+  static get pointerActive(): boolean { return App.#instance.pointerActive; }
   static get router(): Router { return App.#instance.router; }
 
   static get width(): number { return window.innerWidth; }
@@ -95,6 +96,7 @@ export default class App {
 
   raycaster = new Raycaster();
   pointer = new Vector2();
+  pointerActive = false;
 
   router: Router;
 
@@ -132,6 +134,8 @@ export default class App {
     this.router = new Router(this.onRouteChanged.bind(this));
     window.addEventListener('resize', this.onWindowResized.bind(this));
     window.addEventListener('pointermove', this.onPointerMove.bind(this));
+    document.addEventListener('pointerleave', this.onPointerLeave.bind(this));
+    window.addEventListener('blur', this.onPointerLeave.bind(this));
 
     this.load();
   }
@@ -183,6 +187,11 @@ export default class App {
   onPointerMove(event: PointerEvent): void {
     this.pointer.x = (event.clientX / App.width) * 2 - 1;
     this.pointer.y = -(event.clientY / App.height) * 2 + 1;
+    this.pointerActive = true;
+  }
+
+  onPointerLeave(): void {
+    this.pointerActive = false;
   }
 
   updateCameraBounds(): void {
