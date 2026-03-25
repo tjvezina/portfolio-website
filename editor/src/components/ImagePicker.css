@@ -13,6 +13,19 @@
   position: relative;
   display: inline-block;
   margin-bottom: 8px;
+  cursor: grab;
+}
+
+.image-preview-container:active {
+  cursor: grabbing;
+}
+
+.image-preview-container.dragging {
+  opacity: 0.4;
+}
+
+.image-preview-container.drop-target {
+  border-left: 2px solid #d4a86a;
 }
 
 .image-preview {

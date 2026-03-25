@@ -2,13 +2,13 @@ import { useCallback, useEffect, useState } from 'react';
 
 import type { CategoryData, ProjectData } from './api';
 import { fetchCategories, reorderProjects } from './api';
+import NewProjectDialog from './components/NewProjectDialog';
 import ProjectForm from './components/ProjectForm';
 import ProjectList from './components/ProjectList';
 
 interface Selection {
   category: string;
   slug: string | null;
-  isNew: boolean;
 }
 
 export default function App(): React.ReactElement {
@@ -16,8 +16,8 @@ export default function App(): React.ReactElement {
   const [selection, setSelection] = useState<Selection>({
     category: 'personal',
     slug: null,
-    isNew: false,
   });
+  const [showNewDialog, setShowNewDialog] = useState(false);
 
   const loadCategories = useCallback(async () => {
     const data = await fetchCategories();
@@ -43,43 +43,48 @@ export default function App(): React.ReactElement {
           selectedCategory={selection.category}
           selectedSlug={selection.slug}
           onSelectCategory={(category) =>
-            setSelection({ category, slug: null, isNew: false })
+            setSelection({ category, slug: null })
           }
           onSelectProject={(category, slug) =>
-            setSelection({ category, slug, isNew: false })
+            setSelection({ category, slug })
           }
-          onNewProject={() =>
-            setSelection((prev) => ({ ...prev, slug: null, isNew: true }))
-          }
+          onNewProject={() => setShowNewDialog(true)}
           onReorder={async (category, slugs) => {
             await reorderProjects(category, slugs);
             await loadCategories();
           }}
         />
         <div className="form-panel">
-          {(selection.isNew || selectedProject) && (
+          {selectedProject && (
             <ProjectForm
               category={selection.category}
-              project={selection.isNew ? null : selectedProject!}
+              project={selectedProject}
               onSaved={async (savedSlug) => {
                 await loadCategories();
-                setSelection((prev) => ({
-                  ...prev,
-                  slug: savedSlug,
-                  isNew: false,
-                }));
+                setSelection((prev) => ({ ...prev, slug: savedSlug }));
               }}
               onDeleted={async () => {
                 await loadCategories();
-                setSelection((prev) => ({ ...prev, slug: null, isNew: false }));
+                setSelection((prev) => ({ ...prev, slug: null }));
               }}
             />
           )}
-          {!selection.isNew && !selectedProject && (
+          {!selectedProject && (
             <p className="placeholder">Select a project or create a new one.</p>
           )}
         </div>
       </div>
+      {showNewDialog && (
+        <NewProjectDialog
+          category={selection.category}
+          onCreated={async (slug) => {
+            setShowNewDialog(false);
+            await loadCategories();
+            setSelection((prev) => ({ ...prev, slug }));
+          }}
+          onCancel={() => setShowNewDialog(false)}
+        />
+      )}
     </div>
   );
 }
