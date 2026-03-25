@@ -1,8 +1,10 @@
-import { BoxGeometry, Object3D, Plane, PlaneGeometry, Vector2, Vector3 } from 'three';
+import { BoxGeometry, Mesh, MeshBasicMaterial, Object3D, Plane, PlaneGeometry, TextureLoader, Vector3 } from 'three';
 
 import App from '@/core/app';
 import { NeonColor } from '@/core/neon-color';
+import { getCategoryData } from '@/data/loader';
 import { ProjectArea, ProjectData } from '@/data/types';
+import Text from '@/objects/text';
 import Wireframe from '@/objects/wireframe';
 
 /** How far (Chebyshev distance) the grid extends from the center cell. */
@@ -26,6 +28,12 @@ const PRISM_LERP_SPEED = 10;
 /** Duration for prisms to settle back to base z during reverse fold. */
 const REVERSE_SETTLE_DURATION = 0.3;
 
+/** Duration in seconds for thumbnail textures to fade in after loading. */
+const THUMBNAIL_FADE_DURATION = 0.5;
+
+/** Duration in seconds for the hover overlay to fade in/out. */
+const HOVER_FADE_DURATION = 0.15;
+
 function easeOutCubic(t: number): number {
   return 1 - Math.pow(1 - t, 3);
 }
@@ -43,6 +51,88 @@ interface WaveCell {
   dr: number;
 }
 
+interface PrismData {
+  wireframe: Wireframe;
+  col: number;
+  row: number;
+  cx: number;
+  cy: number;
+  project?: ProjectData;
+  thumbnailMesh?: Mesh;
+  thumbnailFadeIn?: number;
+  overlay?: Object3D;
+  hoverProgress?: number;
+  overlayMaterials?: { material: MeshBasicMaterial; targetOpacity: number }[];
+}
+
+/** Generate (col, row) coordinates along a spiral from the center outward. */
+function generateSpiralCoords(count: number): [number, number][] {
+  const coords: [number, number][] = [[0, 0]];
+  let x = 0, y = 0, dx = 1, dy = 0;
+  let steps = 1, stepsTaken = 0, turns = 0;
+  while (coords.length < count) {
+    x += dx;
+    y += dy;
+    coords.push([x, y]);
+    stepsTaken++;
+    if (stepsTaken >= steps) {
+      stepsTaken = 0;
+      turns++;
+      [dx, dy] = [-dy, dx];
+      if (turns % 2 === 0) steps++;
+    }
+  }
+  return coords;
+}
+
+interface FontGlyphData {
+  resolution: number;
+  glyphs: Record<string, { ha: number }>;
+}
+
+function measureTextWidth(text: string, size: number): number {
+  const { resolution, glyphs } = App.synthaFont.data as unknown as FontGlyphData;
+  const scale = size / resolution;
+  let width = 0;
+  for (const char of text) {
+    const glyph = glyphs[char];
+    if (glyph) width += glyph.ha * scale;
+  }
+  return width;
+}
+
+function wrapText(text: string, size: number, maxWidth: number): string[] {
+  const words = text.split(' ');
+  const lines: string[] = [];
+  let currentLine = '';
+  for (const word of words) {
+    const testLine = currentLine ? `${currentLine} ${word}` : word;
+    if (measureTextWidth(testLine, size) > maxWidth && currentLine) {
+      lines.push(currentLine);
+      currentLine = word;
+    } else {
+      currentLine = testLine;
+    }
+  }
+  if (currentLine) lines.push(currentLine);
+  return lines;
+}
+
+/** Wrap text and reduce font size if any line still overflows maxWidth. */
+function fitText(text: string, preferredSize: number, maxWidth: number): { lines: string[]; size: number } {
+  let size = preferredSize;
+  for (let i = 0; i < 5; i++) {
+    const lines = wrapText(text, size, maxWidth);
+    let widest = 0;
+    for (const line of lines) {
+      widest = Math.max(widest, measureTextWidth(line, size));
+    }
+    if (widest <= maxWidth) return { lines, size };
+    size *= maxWidth / widest;
+  }
+  return { lines: wrapText(text, size, maxWidth), size };
+}
+
 export default class CategoryGridView extends Object3D {
   area: ProjectArea;
   onProjectClicked: ((project: ProjectData) => void) | null = null;
@@ -50,10 +140,6 @@ export default class CategoryGridView extends Object3D {
   initialFace: Wireframe | null = null;
 
   private color: NeonColor;
-  private isPanning = false;
-  private panStart = new Vector2();
-  private dragDistance = 0;
-  private originalPosition = new Vector3();
 
   // BFS wave unfold state
   private filledCells = new Set<string>();
@@ -68,8 +154,11 @@ export default class CategoryGridView extends Object3D {
   private onAllWavesComplete: (() => void) | null = null;
 
   // Prism grid state (active after unfold completes)
-  private prisms: { wireframe: Wireframe, col: number, row: number, cx: number, cy: number }[] = [];
+  private prisms: PrismData[] = [];
   private prismsActive = false;
+  private projectMap = new Map<string, ProjectData>();
+  private hoveredPrism: PrismData | null = null;
+  private textureLoader = new TextureLoader();
 
   // Reverse fold state
   private reversePhase: 'idle' | 'settling' | 'folding' = 'idle';
@@ -80,28 +169,17 @@ export default class CategoryGridView extends Object3D {
   private onReverseFoldComplete: (() => void) | null = null;
   private squares = new Map<string, Wireframe>();
 
-  private onPointerDown: (e: PointerEvent) => void;
-  private onPointerMove: (e: PointerEvent) => void;
-  private onPointerUp: (e: PointerEvent) => void;
-
   constructor(area: ProjectArea, color: NeonColor) {
     super();
     this.area = area;
     this.color = color;
 
-    this.onPointerDown = this.handlePointerDown.bind(this);
-    this.onPointerMove = this.handlePointerMove.bind(this);
-    this.onPointerUp = this.handlePointerUp.bind(this);
-  }
-
-  /** Store the current position as the original so resetPan can restore it. */
-  saveOriginalPosition(): void {
-    this.originalPosition.copy(this.position);
-  }
-
-  /** Reset position to the stored original, undoing any pan drift. */
-  resetPan(): void {
-    this.position.copy(this.originalPosition);
+    const projects = getCategoryData(area).projects;
+    const spiralCoords = generateSpiralCoords(projects.length);
+    for (let i = 0; i < projects.length; i++) {
+      const [col, row] = spiralCoords[i];
+      this.projectMap.set(`${col},${row}`, projects[i]);
+    }
   }
 
   /**
@@ -135,6 +213,7 @@ export default class CategoryGridView extends Object3D {
     for (const { wireframe } of this.prisms) this.remove(wireframe);
     this.prisms = [];
     this.prismsActive = false;
+    this.hoveredPrism = null;
 
     // Reset BFS state
     this.filledCells.clear();
@@ -169,6 +248,7 @@ export default class CategoryGridView extends Object3D {
 
     // Stop cursor interaction
     this.prismsActive = false;
+    this.clearHover();
 
     // Capture starting z for each prism (may differ due to cursor interaction)
     this.prismStartZ = this.prisms.map(p => p.wireframe.position.z);
@@ -250,17 +330,9 @@ export default class CategoryGridView extends Object3D {
     }
   }
 
-  enableInput(): void {
-    window.addEventListener('pointerdown', this.onPointerDown);
-    window.addEventListener('pointermove', this.onPointerMove);
-    window.addEventListener('pointerup', this.onPointerUp);
-  }
+  enableInput(): void {}
 
-  disableInput(): void {
-    window.removeEventListener('pointerdown', this.onPointerDown);
-    window.removeEventListener('pointermove', this.onPointerMove);
-    window.removeEventListener('pointerup', this.onPointerUp);
-  }
+  disableInput(): void {}
 
   // ---------------------------------------------------------------------------
   // Reverse fold helpers
@@ -514,6 +586,19 @@ export default class CategoryGridView extends Object3D {
     return this.computeNextWaveFrom(this.filledCells);
   }
 
+  private clearHover(): void {
+    for (const prismData of this.prisms) {
+      if (prismData.hoverProgress !== undefined && prismData.hoverProgress > 0) {
+        prismData.hoverProgress = 0;
+        for (const { material } of prismData.overlayMaterials!) {
+          material.opacity = 0;
+        }
+        prismData.overlay!.visible = false;
+      }
+    }
+    this.hoveredPrism = null;
+  }
+
   /** Create a single prism at the given grid cell and add it to the prism list. */
   private createPrism(col: number, row: number): void {
     const cs = this.cellSize;
@@ -522,15 +607,90 @@ export default class CategoryGridView extends Object3D {
     const cy = row * cs;
     prism.position.set(cx, cy, -PRISM_DEPTH / 2);
     this.add(prism);
-    this.prisms.push({ wireframe: prism, col, row, cx, cy });
+
+    const key = `${col},${row}`;
+    const project = this.projectMap.get(key);
+    const prismData: PrismData = { wireframe: prism, col, row, cx, cy, project };
+
+    if (project?.thumbnail) {
+      // Thumbnail texture on front face (starts invisible, fades in when loaded)
+      const thumbnailGeo = new PlaneGeometry(cs, cs);
+      const thumbnailMat = new MeshBasicMaterial({ transparent: true, opacity: 0 });
+      const thumbnailMesh = new Mesh(thumbnailGeo, thumbnailMat);
+      thumbnailMesh.position.z = PRISM_DEPTH / 2 + 0.01;
+      prism.add(thumbnailMesh);
+      prismData.thumbnailMesh = thumbnailMesh;
+
+      this.textureLoader.load(project.thumbnail, (texture) => {
+        thumbnailMat.map = texture;
+        thumbnailMat.needsUpdate = true;
+        prismData.thumbnailFadeIn = 0;
+      });
+
+      // Hover overlay: dim layer + word-wrapped title + year
+      const overlay = new Object3D();
+      overlay.position.z = PRISM_DEPTH / 2 + 0.02;
+      overlay.visible = false;
+
+      const dimMat = new MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0 });
+      overlay.add(new Mesh(new PlaneGeometry(cs, cs), dimMat));
+
+      const maxWidth = cs * 0.85;
+      const { lines: titleLines, size: titleSize } = fitText(project.title, cs * 0.09, maxWidth);
+      const lineHeight = titleSize * 1.4;
+      const titleBlockHeight = lineHeight * titleLines.length;
+      const yearSize = cs * 0.07;
+      const gap = cs * 0.03;
+      const totalHeight = titleBlockHeight + (project.year ? gap + yearSize : 0);
+      const topY = totalHeight / 2;
+
+      for (let i = 0; i < titleLines.length; i++) {
+        const lineText = new Text(titleLines[i], App.synthaFont, {
+          color: this.color,
+          size: titleSize,
+        });
+        lineText.position.y = topY - lineHeight / 2 - i * lineHeight;
+        lineText.position.z = 0.01;
+        overlay.add(lineText);
+      }
+
+      if (project.year) {
+        const yearText = new Text(String(project.year), App.synthaFont, {
+          color: NeonColor.White,
+          size: yearSize,
+        });
+        yearText.position.y = -topY + yearSize / 2;
+        yearText.position.z = 0.01;
+        overlay.add(yearText);
+      }
+
+      // Collect all materials in the overlay for fade animation
+      const overlayMaterials: PrismData['overlayMaterials'] = [
+        { material: dimMat, targetOpacity: 0.6 },
+      ];
+      overlay.traverse((child) => {
+        if (child instanceof Mesh && child.material instanceof MeshBasicMaterial && child.material !== dimMat) {
+          child.material.transparent = true;
+          child.material.opacity = 0;
+          overlayMaterials.push({ material: child.material, targetOpacity: 1.0 });
+        }
+      });
+
+      prism.add(overlay);
+      prismData.overlay = overlay;
+      prismData.hoverProgress = 0;
+      prismData.overlayMaterials = overlayMaterials;
+    }
+
+    this.prisms.push(prismData);
   }
 
-  /** Position prisms based on cursor proximity. */
+  /** Position prisms based on cursor proximity and manage project hover state. */
   private updatePrisms(): void {
     const ray = App.raycaster.ray;
     const intersect = new Vector3();
     const plane = new Plane(new Vector3(0, 0, 1), -PRISM_MAX_EXTENSION);
-    const didIntersect = ray.intersectPlane(plane, intersect) !== null;
+    const didIntersect = App.pointerActive && ray.intersectPlane(plane, intersect) !== null;
 
     // Convert intersection to grid-local XY
     const gridWorld = new Vector3();
@@ -539,8 +699,10 @@ export default class CategoryGridView extends Object3D {
     const localY = intersect.y - gridWorld.y;
 
     const halfCell = this.cellSize / 2;
+    let newHovered: PrismData | null = null;
 
-    for (const { wireframe, cx, cy } of this.prisms) {
+    for (const prismData of this.prisms) {
+      const { wireframe, cx, cy } = prismData;
       const dx = localX - cx;
       const dy = localY - cy;
       const dist = didIntersect ? Math.sqrt(dx * dx + dy * dy) : Infinity;
@@ -552,6 +714,34 @@ export default class CategoryGridView extends Object3D {
 
       const targetZ = -PRISM_DEPTH / 2 + extension;
       wireframe.position.z += (targetZ - wireframe.position.z) * (1 - Math.exp(-PRISM_LERP_SPEED * App.deltaTime));
+
+      // Detect hover: cursor within this project cell's bounds
+      if (didIntersect && prismData.project &&
+          Math.abs(dx) <= halfCell && Math.abs(dy) <= halfCell) {
+        newHovered = prismData;
+      }
+
+      // Drive thumbnail fade-in
+      if (prismData.thumbnailFadeIn !== undefined && prismData.thumbnailFadeIn < 1) {
+        prismData.thumbnailFadeIn = Math.min(1, prismData.thumbnailFadeIn + App.deltaTime / THUMBNAIL_FADE_DURATION);
+        (prismData.thumbnailMesh!.material as MeshBasicMaterial).opacity = prismData.thumbnailFadeIn;
+      }
+    }
+
+    // Drive hover overlay fade animations
+    this.hoveredPrism = newHovered;
+    for (const prismData of this.prisms) {
+      if (prismData.hoverProgress === undefined) continue;
+      const target = prismData === newHovered ? 1 : 0;
+      if (prismData.hoverProgress === target) continue;
+      const step = App.deltaTime / HOVER_FADE_DURATION;
+      prismData.hoverProgress = target > prismData.hoverProgress
+        ? Math.min(target, prismData.hoverProgress + step)
+        : Math.max(target, prismData.hoverProgress - step);
+      for (const { material, targetOpacity } of prismData.overlayMaterials!) {
+        material.opacity = targetOpacity * prismData.hoverProgress;
+      }
+      prismData.overlay!.visible = prismData.hoverProgress > 0;
     }
   }
 
@@ -596,23 +786,4 @@ export default class CategoryGridView extends Object3D {
     this.waveActive = true;
   }
 
-  private handlePointerDown(e: PointerEvent): void {
-    this.isPanning = true;
-    this.dragDistance = 0;
-    this.panStart.set(e.clientX, e.clientY);
-  }
-
-  private handlePointerMove(e: PointerEvent): void {
-    if (!this.isPanning) return;
-    const dx = (e.clientX - this.panStart.x) / App.width * 10;
-    const dy = -(e.clientY - this.panStart.y) / App.height * 10;
-    this.dragDistance += Math.abs(e.clientX - this.panStart.x) + Math.abs(e.clientY - this.panStart.y);
-    this.position.x += dx;
-    this.position.y += dy;
-    this.panStart.set(e.clientX, e.clientY);
-  }
-
-  private handlePointerUp(): void {
-    this.isPanning = false;
-  }
 }

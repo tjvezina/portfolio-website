@@ -164,7 +164,6 @@ export default class ViewManager extends Object3D {
     if (planet) {
       // Grid will be centered at the origin (where the planet flies to)
       grid.position.set(0, 0, 0);
-      grid.saveOriginalPosition();
 
       // Planet flies to screen center and scales up to fill the grid area
       const targetScale = (HOME_AREA_WIDTH / GRID_COLS) / PLANET_EDGE_SIZE[area];
@@ -193,7 +192,6 @@ export default class ViewManager extends Object3D {
       const grid = this.categoryViews.get(area);
       if (grid) {
         grid.disableInput();
-        grid.resetPan();
 
         const cellSize = HOME_AREA_WIDTH / GRID_COLS;
         grid.startReverseFold(cellSize, () => {
@@ -314,7 +312,6 @@ export default class ViewManager extends Object3D {
 
     // Grid at origin (no camera movement in this strategy)
     gridView.position.set(0, 0, 0);
-    gridView.saveOriginalPosition();
     gridView.visible = true;
     gridView.enableInput();
 
