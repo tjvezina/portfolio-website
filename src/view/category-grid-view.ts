@@ -1,4 +1,4 @@
-import { BoxGeometry, Mesh, MeshBasicMaterial, Object3D, Plane, PlaneGeometry, TextureLoader, Vector3 } from 'three';
+import { BoxGeometry, Mesh, MeshBasicMaterial, Object3D, Plane, PlaneGeometry, SRGBColorSpace, TextureLoader, Vector3 } from 'three';
 
 import App from '@/core/app';
 import { NeonColor } from '@/core/neon-color';
@@ -28,8 +28,8 @@ const PRISM_LERP_SPEED = 10;
 /** Duration for prisms to settle back to base z during reverse fold. */
 const REVERSE_SETTLE_DURATION = 0.3;
 
-/** Duration in seconds for thumbnail textures to fade in after loading. */
-const THUMBNAIL_FADE_DURATION = 0.5;
+/** Duration in seconds for thumbnail textures to fade in/out. */
+const THUMBNAIL_FADE_DURATION = 0.2;
 
 /** Duration in seconds for the hover overlay to fade in/out. */
 const HOVER_FADE_DURATION = 0.15;
@@ -84,6 +84,13 @@ function generateSpiralCoords(count: number): [number, number][] {
   }
   return coords;
 }
+
+/** Fixed 3x3 grid layout for the 9 college projects. */
+const COLLEGE_COORDS: [number, number][] = [
+  [-1, 1], [0, 1], [1, 1],
+  [-1, 0], [0, 0], [1, 0],
+  [-1, -1], [0, -1], [1, -1],
+];
 
 interface FontGlyphData {
   resolution: number;
@@ -161,7 +168,8 @@ export default class CategoryGridView extends Object3D {
   private textureLoader = new TextureLoader();
 
   // Reverse fold state
-  private reversePhase: 'idle' | 'settling' | 'folding' = 'idle';
+  private reversePhase: 'idle' | 'fading' | 'settling' | 'folding' = 'idle';
+  private reverseFadeElapsed = 0;
   private reverseSettleElapsed = 0;
   private prismStartZ: number[] = [];
   private reverseWaves: WaveCell[][] = [];
@@ -175,9 +183,11 @@ export default class CategoryGridView extends Object3D {
     this.color = color;
 
     const projects = getCategoryData(area).projects;
-    const spiralCoords = generateSpiralCoords(projects.length);
+    const coords = area === ProjectArea.College
+      ? COLLEGE_COORDS
+      : generateSpiralCoords(projects.length);
     for (let i = 0; i < projects.length; i++) {
-      const [col, row] = spiralCoords[i];
+      const [col, row] = coords[i];
       this.projectMap.set(`${col},${row}`, projects[i]);
     }
   }
@@ -190,6 +200,26 @@ export default class CategoryGridView extends Object3D {
     if (this.initialFace) return;
     this.initialFace = new Wireframe(new PlaneGeometry(cellSize, cellSize), { color: this.color });
     this.add(this.initialFace);
+  }
+
+  /**
+   * Build the entire grid instantly (no animation).  Used when navigating
+   * directly to a category URL so the grid appears fully formed.
+   */
+  buildImmediate(cellSize: number): void {
+    this.cellSize = cellSize;
+    this.filledCells.clear();
+    this.filledCells.add('0,0');
+    this.createPrism(0, 0);
+    this.prismsActive = true;
+
+    const wave1: WaveCell[] = [
+      { col: 0, row: 1, dc: 0, dr: 1 },
+      { col: 0, row: -1, dc: 0, dr: -1 },
+      { col: 1, row: 0, dc: 1, dr: 0 },
+      { col: -1, row: 0, dc: -1, dr: 0 },
+    ];
+    this.fillRemainingCells(wave1);
   }
 
   /**
@@ -257,9 +287,9 @@ export default class CategoryGridView extends Object3D {
     this.reverseWaves = this.computeAllWaves();
     this.reverseWaveIndex = this.reverseWaves.length - 1;
 
-    // Start settling phase
-    this.reversePhase = 'settling';
-    this.reverseSettleElapsed = 0;
+    // Fade out thumbnails before settling/folding
+    this.reversePhase = 'fading';
+    this.reverseFadeElapsed = 0;
   }
 
   /** Remove the center square left after a completed reverse fold. */
@@ -339,6 +369,21 @@ export default class CategoryGridView extends Object3D {
   // ---------------------------------------------------------------------------
 
   private updateReverse(): void {
+    if (this.reversePhase === 'fading') {
+      this.reverseFadeElapsed += App.deltaTime;
+      const t = Math.min(1, this.reverseFadeElapsed / THUMBNAIL_FADE_DURATION);
+      for (const prismData of this.prisms) {
+        if (prismData.thumbnailMesh) {
+          (prismData.thumbnailMesh.material as MeshBasicMaterial).opacity = 1 - t;
+        }
+      }
+      if (t >= 1) {
+        this.reversePhase = 'settling';
+        this.reverseSettleElapsed = 0;
+      }
+      return;
+    }
+
     if (this.reversePhase === 'settling') {
       this.reverseSettleElapsed += App.deltaTime;
       const t = Math.min(1, this.reverseSettleElapsed / REVERSE_SETTLE_DURATION);
@@ -622,6 +667,7 @@ export default class CategoryGridView extends Object3D {
       prismData.thumbnailMesh = thumbnailMesh;
 
       this.textureLoader.load(project.thumbnail, (texture) => {
+        texture.colorSpace = SRGBColorSpace;
         thumbnailMat.map = texture;
         thumbnailMat.needsUpdate = true;
         prismData.thumbnailFadeIn = 0;
@@ -666,7 +712,7 @@ export default class CategoryGridView extends Object3D {
 
       // Collect all materials in the overlay for fade animation
       const overlayMaterials: PrismData['overlayMaterials'] = [
-        { material: dimMat, targetOpacity: 0.8 },
+        { material: dimMat, targetOpacity: 0.6 },
       ];
       overlay.traverse((child) => {
         if (child instanceof Mesh && child.material instanceof MeshBasicMaterial && child.material !== dimMat) {

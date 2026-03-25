@@ -11,12 +11,12 @@ import GridCell from '@/view/grid/grid-cell';
 import { HomeView, setInputEnabled } from '@/view/home-view';
 import ProjectPageView from '@/view/project-page-view';
 import CameraTransition from '@/view/transition/camera-transition';
-import PlanetFocusTransition from '@/view/transition/planet-focus-transition';
+import PlanetFocusTransition, { computeFaceUpQuat } from '@/view/transition/planet-focus-transition';
 import PrismPushTransition from '@/view/transition/prism-push-transition';
 
 export { setInputEnabled };
 
-const GRID_COLS = 4.75;
+const GRID_COLS = 4.5;
 
 const PHI = (1 + Math.sqrt(5)) / 2;
 
@@ -74,7 +74,7 @@ export default class ViewManager extends Object3D {
     this.backButtonOriginalZ = this.backButton.position.z;
     this.backButton.updatePosition();
     this.backButton.onClick = (): void => {
-      window.history.back();
+      App.router.navigate({ type: 'home' });
     };
     App.cameraRig.add(this.backButton);
   }
@@ -310,12 +310,30 @@ export default class ViewManager extends Object3D {
     }
     const gridView = this.categoryViews.get(area)!;
 
-    // Grid at origin (no camera movement in this strategy)
+    // Stop orbits so anchor positions are stable for the back-navigation transition
+    this.homeView.stopOrbiting();
+
+    // Freeze the selected planet's tumble and align a face toward the camera,
+    // so the reverse transition seamlessly replaces the center grid square.
+    const planet = this.homeView.planetList.find(p => p.area === area);
+    if (planet) {
+      const alignedQuat = computeFaceUpQuat(planet.wireframe, planet.wireframe.quaternion);
+      planet.wireframe.quaternion.copy(alignedQuat);
+      planet.tumble.freeze();
+    }
+
+    // Hide home view — the grid replaces it
+    this.homeView.visible = false;
+
+    // Switch to perspective camera (grid is flat at z=0)
+    App.swapToPerspective(0);
+
+    // Grid at origin, fully built with no animation
     gridView.position.set(0, 0, 0);
+    gridView.buildImmediate(HOME_AREA_WIDTH / GRID_COLS);
     gridView.visible = true;
     gridView.enableInput();
 
-    setInputEnabled(false);
     this.activeCategory = area;
     this.backButton.enable();
   }

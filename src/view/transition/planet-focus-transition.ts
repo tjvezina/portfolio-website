@@ -21,7 +21,7 @@ function getGeometry(wireframe: Wireframe): BufferGeometry | null {
  *   2. Rotates around Z so the vector from F's centroid to F's lowest edge midpoint
  *      points in the world -Y direction (upright).
  */
-function computeFaceUpQuat(wireframe: Wireframe, currentQuat: Quaternion): Quaternion {
+export function computeFaceUpQuat(wireframe: Wireframe, currentQuat: Quaternion): Quaternion {
   const geometry = getGeometry(wireframe);
   if (!geometry) return new Quaternion();
 
