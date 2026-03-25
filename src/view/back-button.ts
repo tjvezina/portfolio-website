@@ -13,7 +13,7 @@ export default class BackButton extends Object3D {
     super();
 
     this.text = new Text('< BACK', App.synthaFont, {
-      color: NeonColor.White,
+      color: NeonColor.Pink,
       size: 0.15 * App.pixelRatio,
       alignX: TextAlignX.Left,
       alignY: TextAlignY.Bottom,

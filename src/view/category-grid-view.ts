@@ -640,7 +640,7 @@ export default class CategoryGridView extends Object3D {
       const lineHeight = titleSize * 1.4;
       const titleBlockHeight = lineHeight * titleLines.length;
       const yearSize = cs * 0.07;
-      const gap = cs * 0.03;
+      const gap = cs * 0.06;
       const totalHeight = titleBlockHeight + (project.year ? gap + yearSize : 0);
       const topY = totalHeight / 2;
 
@@ -656,7 +656,7 @@ export default class CategoryGridView extends Object3D {
 
       if (project.year) {
         const yearText = new Text(String(project.year), App.synthaFont, {
-          color: NeonColor.White,
+          color: this.color,
           size: yearSize,
         });
         yearText.position.y = -topY + yearSize / 2;
@@ -666,7 +666,7 @@ export default class CategoryGridView extends Object3D {
 
       // Collect all materials in the overlay for fade animation
       const overlayMaterials: PrismData['overlayMaterials'] = [
-        { material: dimMat, targetOpacity: 0.6 },
+        { material: dimMat, targetOpacity: 0.8 },
       ];
       overlay.traverse((child) => {
         if (child instanceof Mesh && child.material instanceof MeshBasicMaterial && child.material !== dimMat) {
