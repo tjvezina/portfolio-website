@@ -72,6 +72,18 @@ export default function ProjectForm({
     });
   }
 
+  function cleanForm(data: ProjectData): ProjectData {
+    const cleaned: ProjectData = { slug: data.slug, title: data.title };
+    if (data.description) cleaned.description = data.description;
+    if (data.year) cleaned.year = data.year;
+    if (data.tags && data.tags.length > 0) cleaned.tags = data.tags;
+    if (data.playUrl) cleaned.playUrl = data.playUrl;
+    if (data.sourceUrl) cleaned.sourceUrl = data.sourceUrl;
+    if (data.thumbnail) cleaned.thumbnail = data.thumbnail;
+    if (data.screenshots && data.screenshots.length > 0) cleaned.screenshots = data.screenshots;
+    return cleaned;
+  }
+
   async function handleSave(): Promise<void> {
     if (!form.slug || !form.title) {
       setError('Title and slug are required.');
@@ -80,16 +92,7 @@ export default function ProjectForm({
     setSaving(true);
     setError(null);
     try {
-      // Strip empty optional fields before saving
-      const cleaned: ProjectData = { slug: form.slug, title: form.title };
-      if (form.description) cleaned.description = form.description;
-      if (form.year) cleaned.year = form.year;
-      if (form.tags && form.tags.length > 0) cleaned.tags = form.tags;
-      if (form.playUrl) cleaned.playUrl = form.playUrl;
-      if (form.sourceUrl) cleaned.sourceUrl = form.sourceUrl;
-      if (form.thumbnail) cleaned.thumbnail = form.thumbnail;
-      if (form.screenshots && form.screenshots.length > 0) cleaned.screenshots = form.screenshots;
-
+      const cleaned = cleanForm(form);
       if (isNew) {
         await createProject(category, cleaned);
       } else {
@@ -100,6 +103,19 @@ export default function ProjectForm({
       setError(e instanceof Error ? e.message : 'Save failed');
     } finally {
       setSaving(false);
+    }
+  }
+
+  /** Update an asset field and auto-save so uploads are never lost. */
+  async function saveAssetChange<K extends keyof ProjectData>(key: K, value: ProjectData[K]): Promise<void> {
+    const updated = { ...form, [key]: value };
+    setForm(updated);
+    setError(null);
+    try {
+      await updateProject(category, project!.slug, cleanForm(updated));
+      onSaved(updated.slug);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Auto-save failed');
     }
   }
 
@@ -202,8 +218,8 @@ export default function ProjectForm({
             slug={form.slug}
             type="thumbnail"
             currentPath={form.thumbnail}
-            onImported={(path) => updateField('thumbnail', path)}
-            onRemove={() => updateField('thumbnail', '')}
+            onImported={(path) => saveAssetChange('thumbnail', path)}
+            onRemove={() => saveAssetChange('thumbnail', '')}
           />
 
           <div className="image-picker">
@@ -215,7 +231,7 @@ export default function ProjectForm({
                   <button
                     className="image-remove-btn"
                     onClick={() =>
-                      updateField(
+                      saveAssetChange(
                         'screenshots',
                         (form.screenshots ?? []).filter((_, j) => j !== i),
                       )
@@ -235,7 +251,7 @@ export default function ProjectForm({
               multiple
               onImported={() => {}}
               onMultipleImported={(paths) =>
-                updateField('screenshots', [...(form.screenshots ?? []), ...paths])
+                saveAssetChange('screenshots', [...(form.screenshots ?? []), ...paths])
               }
             />
           </div>
