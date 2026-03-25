@@ -2,6 +2,11 @@
   "slug": "portfolio-website",
   "title": "Portfolio Website",
   "description": "This website — a Three.js neon wireframe experience.",
+  "tags": [
+    "Three.js",
+    "TypeScript",
+    "WebGL"
+  ],
   "sourceUrl": "https://github.com/tylerjvezina/portfolio-website",
-  "tags": ["Three.js", "TypeScript", "WebGL"]
+  "thumbnail": "assets/projects/personal/portfolio-website/thumbnail.png"
 }

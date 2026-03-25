@@ -49,15 +49,15 @@ export default class ProjectPageView extends Object3D {
       yOffset -= 0.6;
     }
 
-    // Date
-    if (project.date) {
-      const dateText = new Text(project.date, App.synthaFont, {
+    // Year
+    if (project.year) {
+      const yearText = new Text(String(project.year), App.synthaFont, {
         color: NeonColor.White,
         size: 0.1 * App.pixelRatio,
         alignX: TextAlignX.Left,
       });
-      dateText.position.set(-3, yOffset, 0);
-      this.add(dateText);
+      yearText.position.set(-3, yOffset, 0);
+      this.add(yearText);
       yOffset -= 0.8;
     }
 

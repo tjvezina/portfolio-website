@@ -13,7 +13,7 @@ export interface ProjectData {
   playUrl?: string;
   sourceUrl?: string;
   tags?: string[];
-  date?: string;
+  year?: number;
 }
 
 export interface CategoryData {
