@@ -14,7 +14,7 @@ const MAX_GRID_RADIUS = 8;
 const WAVE_DURATION = 0.15;
 
 /** Depth of each prism extending behind the grid plane. */
-const PRISM_DEPTH = 5;
+export const PRISM_DEPTH = 5;
 
 /** Maximum distance a prism extends toward the camera (and the cursor-interaction plane z). */
 const PRISM_MAX_EXTENSION = 1.0;
@@ -51,8 +51,9 @@ interface WaveCell {
   dr: number;
 }
 
-interface PrismData {
+export interface PrismData {
   wireframe: Wireframe;
+  originalWireframe?: Wireframe;
   col: number;
   row: number;
   cx: number;
@@ -142,15 +143,15 @@ function fitText(text: string, preferredSize: number, maxWidth: number): { lines
 
 export default class CategoryGridView extends Object3D {
   area: ProjectArea;
-  onProjectClicked: ((project: ProjectData) => void) | null = null;
+  onProjectClicked: ((project: ProjectData, col: number, row: number) => void) | null = null;
 
   initialFace: Wireframe | null = null;
 
-  private color: NeonColor;
+  readonly color: NeonColor;
 
   // BFS wave unfold state
   private filledCells = new Set<string>();
-  private cellSize = 0;
+  cellSize = 0;
   private allWavePivots: Object3D[] = []; // every pivot ever created — for cleanup
   private currentWavePivots: Object3D[] = [];
   private currentWaveConfigs: FoldConfig[] = [];
@@ -161,7 +162,7 @@ export default class CategoryGridView extends Object3D {
   private onAllWavesComplete: (() => void) | null = null;
 
   // Prism grid state (active after unfold completes)
-  private prisms: PrismData[] = [];
+  prisms: PrismData[] = [];
   private prismsActive = false;
   private projectMap = new Map<string, ProjectData>();
   private hoveredPrism: PrismData | null = null;
@@ -354,15 +355,55 @@ export default class CategoryGridView extends Object3D {
       }
     }
 
+    // Drive thumbnail fade-in (runs even when input is disabled)
+    for (const prismData of this.prisms) {
+      if (prismData.thumbnailFadeIn !== undefined && prismData.thumbnailFadeIn < 1) {
+        prismData.thumbnailFadeIn = Math.min(1, prismData.thumbnailFadeIn + App.deltaTime / THUMBNAIL_FADE_DURATION);
+        (prismData.thumbnailMesh!.material as MeshBasicMaterial).opacity = prismData.thumbnailFadeIn;
+      }
+    }
+
     // Drive prism cursor interaction
     if (this.prismsActive) {
       this.updatePrisms();
     }
   }
 
-  enableInput(): void {}
+  enableInput(): void {
+    this.prismsActive = true;
+    window.addEventListener('click', this.clickHandler);
+  }
 
-  disableInput(): void {}
+  disableInput(): void {
+    this.prismsActive = false;
+    this.clearHover();
+    window.removeEventListener('click', this.clickHandler);
+  }
+
+  /** Reset all prism wireframes to their base grid positions. */
+  resetPrismPositions(): void {
+    for (const prism of this.prisms) {
+      // Restore original wireframe if it was swapped for a square during a transition
+      if (prism.originalWireframe) {
+        if (prism.wireframe.parent) prism.wireframe.parent.remove(prism.wireframe);
+        this.add(prism.originalWireframe);
+        if (prism.thumbnailMesh?.parent === prism.wireframe) {
+          prism.wireframe.remove(prism.thumbnailMesh);
+          prism.thumbnailMesh.position.z = PRISM_DEPTH / 2 + 0.01;
+          prism.originalWireframe.add(prism.thumbnailMesh);
+        }
+        prism.wireframe = prism.originalWireframe;
+        prism.originalWireframe = undefined;
+      }
+      prism.wireframe.position.set(prism.cx, prism.cy, -PRISM_DEPTH / 2);
+    }
+  }
+
+  private clickHandler = (): void => {
+    if (this.hoveredPrism?.project) {
+      this.onProjectClicked?.(this.hoveredPrism.project, this.hoveredPrism.col, this.hoveredPrism.row);
+    }
+  };
 
   // ---------------------------------------------------------------------------
   // Reverse fold helpers
@@ -670,7 +711,10 @@ export default class CategoryGridView extends Object3D {
         texture.colorSpace = SRGBColorSpace;
         thumbnailMat.map = texture;
         thumbnailMat.needsUpdate = true;
-        prismData.thumbnailFadeIn = 0;
+        // Only start the fade if it hasn't been bypassed (e.g. by showProjectImmediate)
+        if (prismData.thumbnailFadeIn === undefined) {
+          prismData.thumbnailFadeIn = 0;
+        }
       });
 
       // Hover overlay: dim layer + word-wrapped title + year
@@ -767,11 +811,6 @@ export default class CategoryGridView extends Object3D {
         newHovered = prismData;
       }
 
-      // Drive thumbnail fade-in
-      if (prismData.thumbnailFadeIn !== undefined && prismData.thumbnailFadeIn < 1) {
-        prismData.thumbnailFadeIn = Math.min(1, prismData.thumbnailFadeIn + App.deltaTime / THUMBNAIL_FADE_DURATION);
-        (prismData.thumbnailMesh!.material as MeshBasicMaterial).opacity = prismData.thumbnailFadeIn;
-      }
     }
 
     // Drive hover overlay fade animations

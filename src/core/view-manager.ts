@@ -1,18 +1,16 @@
-import { Object3D, Vector3 } from 'three';
+import { MeshBasicMaterial, Object3D, PlaneGeometry, Vector3 } from 'three';
 
 import App, { HOME_AREA_WIDTH } from '@/core/app';
 import { NeonColor } from '@/core/neon-color';
 import { NavigationDirection, Route } from '@/core/router';
 import { getProjectData } from '@/data/loader';
 import { ProjectArea } from '@/data/types';
+import Wireframe from '@/objects/wireframe';
 import BackButton from '@/view/back-button';
-import CategoryGridView from '@/view/category-grid-view';
-import GridCell from '@/view/grid/grid-cell';
+import CategoryGridView, { PRISM_DEPTH } from '@/view/category-grid-view';
 import { HomeView, setInputEnabled } from '@/view/home-view';
-import ProjectPageView from '@/view/project-page-view';
-import CameraTransition from '@/view/transition/camera-transition';
+import GridTunnelTransition, { computeFlyTarget, TUNNEL_DISTANCE } from '@/view/transition/grid-tunnel-transition';
 import PlanetFocusTransition, { computeFaceUpQuat } from '@/view/transition/planet-focus-transition';
-import PrismPushTransition from '@/view/transition/prism-push-transition';
 
 export { setInputEnabled };
 
@@ -37,7 +35,6 @@ const CATEGORY_COLORS: Record<ProjectArea, NeonColor> = {
 export default class ViewManager extends Object3D {
   homeView: HomeView;
   categoryViews: Map<ProjectArea, CategoryGridView> = new Map();
-  activeTransition: CameraTransition | null = null;
   activeCategory: ProjectArea | null = null;
 
   /** Planet focus transition for home → category (must run after homeView.update). */
@@ -49,10 +46,11 @@ export default class ViewManager extends Object3D {
   private pendingRoutes: { route: Route, direction: NavigationDirection }[] = [];
 
   /** Project page state */
-  private activeProjectView: ProjectPageView | null = null;
-  private activePrismPush: PrismPushTransition | null = null;
-  private activeProjectCell: GridCell | null = null;
-  private pendingProjectBack = false;
+  private activeGridTunnel: GridTunnelTransition | null = null;
+  private viewingProject = false;
+  private clickedProjectCol: number | null = null;
+  private clickedProjectRow: number | null = null;
+  private preProjectCameraPos: Vector3 | null = null;
 
   /** In-scene back navigation button */
   private backButton: BackButton;
@@ -74,7 +72,11 @@ export default class ViewManager extends Object3D {
     this.backButtonOriginalZ = this.backButton.position.z;
     this.backButton.updatePosition();
     this.backButton.onClick = (): void => {
-      App.router.navigate({ type: 'home' });
+      if (this.viewingProject && this.activeCategory) {
+        App.router.navigate({ type: 'category', area: this.activeCategory });
+      } else {
+        App.router.navigate({ type: 'home' });
+      }
     };
     App.cameraRig.add(this.backButton);
   }
@@ -89,7 +91,7 @@ export default class ViewManager extends Object3D {
 
   private executeRoute(route: Route, direction: NavigationDirection): void {
     if (route.type === 'category') {
-      if (direction === 'back' && this.activeProjectView) {
+      if (direction === 'back' && this.viewingProject) {
         this.hideProject();
       } else {
         this.showCategory(route.area);
@@ -128,8 +130,8 @@ export default class ViewManager extends Object3D {
 
   private routeMatchesCurrent(route: Route): boolean {
     if (route.type === 'home') return this.activeCategory === null;
-    if (route.type === 'category') return this.activeCategory === route.area && !this.activeProjectView;
-    if (route.type === 'project') return !!this.activeProjectView;
+    if (route.type === 'category') return this.activeCategory === route.area && !this.viewingProject;
+    if (route.type === 'project') return this.viewingProject;
     return false;
   }
 
@@ -185,6 +187,21 @@ export default class ViewManager extends Object3D {
     this.backButton.disable();
     setInputEnabled(false);
 
+    // If coming from a project, clean up project state first
+    if (this.viewingProject && this.activeCategory) {
+      this.viewingProject = false;
+      this.activeGridTunnel = null;
+      const grid = this.categoryViews.get(this.activeCategory);
+      if (grid) {
+        grid.resetPrismPositions();
+        grid.visible = true;
+      }
+      this.clickedProjectCol = null;
+      this.clickedProjectRow = null;
+      this.preProjectCameraPos = null;
+      App.cameraRig.position.set(0, 0, App.cameraRig.position.z);
+    }
+
     if (this.activeCategory) {
       this.busy = true;
       this.transitionTarget = { type: 'home' };
@@ -222,64 +239,112 @@ export default class ViewManager extends Object3D {
   }
 
   private wireGridCallbacks(grid: CategoryGridView, area: ProjectArea): void {
-    grid.onProjectClicked = (project): void => {
+    grid.onProjectClicked = (project, col, row): void => {
+      this.clickedProjectCol = col;
+      this.clickedProjectRow = row;
       App.router.navigate({ type: 'project', area, slug: project.slug });
     };
   }
 
   private showProject(area: ProjectArea, slug: string): void {
-    const project = getProjectData(area, slug);
-    if (!project) return;
+    if (!getProjectData(area, slug)) return;
+
     this.busy = true;
     this.transitionTarget = { type: 'project', area, slug };
+    this.viewingProject = true;
 
-    const color = CATEGORY_COLORS[area];
-
-    // Disable grid input during transition
     const grid = this.categoryViews.get(area);
     grid?.disableInput();
 
-    // Create project page behind the grid
-    const projectView = new ProjectPageView(project, color);
-    if (grid) {
-      projectView.position.set(grid.position.x, grid.position.y, -5);
-    }
-    this.add(projectView);
-    this.activeProjectView = projectView;
+    // Store camera position so the reverse transition can restore it
+    this.preProjectCameraPos = App.cameraRig.position.clone();
 
-    // Start prism push transition if we have a clicked cell
-    if (this.activeProjectCell) {
-      this.activePrismPush = new PrismPushTransition(this.activeProjectCell, false);
+    // Look up col/row from slug if not already known (e.g. browser back to project URL)
+    if (grid && (this.clickedProjectCol === null || this.clickedProjectRow === null)) {
+      const prismData = grid.prisms.find(p => p.project?.slug === slug);
+      if (prismData) {
+        this.clickedProjectCol = prismData.col;
+        this.clickedProjectRow = prismData.row;
+      }
     }
 
-    // Move camera forward through the grid
-    const cameraTarget = new Vector3(
-      App.cameraRig.position.x,
-      App.cameraRig.position.y,
-      App.cameraRig.position.z - 5,
-    );
-    this.activeTransition = new CameraTransition(cameraTarget, 1.0);
+    // Start the tunnel transition if we have a clicked cell
+    if (grid && this.clickedProjectCol !== null && this.clickedProjectRow !== null) {
+      this.activeGridTunnel = new GridTunnelTransition(
+        grid, this.clickedProjectCol, this.clickedProjectRow, false,
+      );
+    } else {
+      // No grid cell for this project — show immediately without animation
+      if (grid) grid.visible = false;
+      this.settle();
+    }
   }
 
   private hideProject(): void {
     this.busy = true;
     this.transitionTarget = { type: 'category', area: this.activeCategory! };
-    // Disable back button during transition to prevent double-navigation
     this.backButton.disable();
 
-    // Start reverse prism push
-    if (this.activeProjectCell) {
-      this.activePrismPush = new PrismPushTransition(this.activeProjectCell, true);
-    }
+    const grid = this.categoryViews.get(this.activeCategory!);
 
-    // Move camera back to grid plane
-    const cameraTarget = new Vector3(
-      App.cameraRig.position.x,
-      App.cameraRig.position.y,
-      App.cameraRig.position.z + 5,
-    );
-    this.activeTransition = new CameraTransition(cameraTarget, 1.0);
-    this.pendingProjectBack = true;
+    if (grid && this.clickedProjectCol !== null && this.clickedProjectRow !== null) {
+      // Reparent the selected square back to the grid for the reverse transition
+      const prism = grid.prisms.find(
+        p => p.col === this.clickedProjectCol && p.row === this.clickedProjectRow,
+      );
+      if (prism?.originalWireframe && prism.wireframe.parent === this) {
+        this.remove(prism.wireframe);
+        grid.add(prism.wireframe);
+      }
+
+      // Animated reverse: square flies back, tunnel reverses, camera un-centers
+      grid.visible = true;
+      this.activeGridTunnel = new GridTunnelTransition(
+        grid, this.clickedProjectCol, this.clickedProjectRow, true,
+        this.preProjectCameraPos ?? undefined,
+      );
+    } else {
+      // No animation (direct URL navigation) — just show the grid
+      this.viewingProject = false;
+      if (grid) {
+        grid.visible = true;
+        grid.enableInput();
+      }
+      this.backButton.enable();
+      this.settle();
+    }
+  }
+
+  private onGridTunnelComplete(): void {
+    const wasReverse = this.activeGridTunnel!.reverse;
+    this.activeGridTunnel = null;
+
+    if (wasReverse) {
+      // Returned from project to category grid
+      this.viewingProject = false;
+      this.clickedProjectCol = null;
+      this.clickedProjectRow = null;
+      this.preProjectCameraPos = null;
+      const grid = this.categoryViews.get(this.activeCategory!);
+      grid?.enableInput();
+      this.backButton.enable();
+      this.settle();
+    } else {
+      // Arrived at project — hide the grid but keep the selected square visible
+      const grid = this.categoryViews.get(this.activeCategory!);
+      if (grid) {
+        // Reparent the selected square to ViewManager so it survives grid.visible = false
+        const prism = grid.prisms.find(
+          p => p.col === this.clickedProjectCol && p.row === this.clickedProjectRow,
+        );
+        if (prism?.originalWireframe) {
+          grid.remove(prism.wireframe);
+          this.add(prism.wireframe);
+        }
+        grid.visible = false;
+      }
+      this.settle();
+    }
   }
 
   initializeAtRoute(route: Route): void {
@@ -339,25 +404,68 @@ export default class ViewManager extends Object3D {
   }
 
   private showProjectImmediate(area: ProjectArea, slug: string): void {
-    const projectData = getProjectData(area, slug);
-    if (!projectData) return;
+    if (!getProjectData(area, slug)) return;
 
-    const color = CATEGORY_COLORS[area];
-    const projectView = new ProjectPageView(projectData, color);
+    const grid = this.categoryViews.get(area);
+    if (!grid) return;
 
-    // Position behind the grid
-    const gridView = this.categoryViews.get(area);
-    if (gridView) {
-      projectView.position.set(gridView.position.x, gridView.position.y, -5);
-      gridView.disableInput();
+    grid.disableInput();
+
+    // Find the grid cell for this project
+    const prismData = grid.prisms.find(p => p.project?.slug === slug);
+    if (!prismData) {
+      grid.visible = false;
+      this.viewingProject = true;
+      return;
     }
 
-    projectView.visible = true;
-    this.add(projectView);
-    this.activeProjectView = projectView;
+    const col = prismData.col;
+    const row = prismData.row;
+    this.clickedProjectCol = col;
+    this.clickedProjectRow = row;
 
-    // Move camera to project page position (no animation)
-    App.cameraRig.position.z = App.cameraRig.position.z - 5;
+    // Save the default camera position for the reverse transition
+    this.preProjectCameraPos = new Vector3(0, 0, App.cameraRig.position.z);
+
+    // Center camera on the clicked cell (as if center-on-camera had completed)
+    App.cameraRig.position.x = col * grid.cellSize + grid.position.x;
+    App.cameraRig.position.y = row * grid.cellSize + grid.position.y;
+
+    // Create a square at the fly-target position (top-left of screen)
+    const square = new Wireframe(new PlaneGeometry(grid.cellSize, grid.cellSize), { color: grid.color });
+    const flyTarget = computeFlyTarget(grid.cellSize);
+    square.position.copy(flyTarget);
+
+    // Transfer thumbnail from prism to square
+    if (prismData.thumbnailMesh?.parent === prismData.wireframe) {
+      prismData.wireframe.remove(prismData.thumbnailMesh);
+      prismData.thumbnailMesh.position.z = 0.01;
+      square.add(prismData.thumbnailMesh);
+    }
+    // Show thumbnail immediately (bypass fade-in)
+    if (prismData.thumbnailMesh) {
+      (prismData.thumbnailMesh.material as MeshBasicMaterial).opacity = 1;
+      prismData.thumbnailFadeIn = 1;
+    }
+
+    // Swap prism for square in PrismData (remove original from grid)
+    grid.remove(prismData.wireframe);
+    prismData.originalWireframe = prismData.wireframe;
+    prismData.wireframe = square;
+
+    // Move other prisms to tunnel-end positions (off-screen forward)
+    const baseZ = -PRISM_DEPTH / 2;
+    for (const p of grid.prisms) {
+      if (p !== prismData) {
+        p.wireframe.position.z = baseZ + TUNNEL_DISTANCE;
+      }
+    }
+
+    // Reparent square to ViewManager so it stays visible when grid is hidden
+    this.add(square);
+    grid.visible = false;
+
+    this.viewingProject = true;
   }
 
   onCameraSwapped(matchPlaneLocalZ: number): void {
@@ -373,43 +481,11 @@ export default class ViewManager extends Object3D {
   }
 
   update(): void {
-    // Update prism push independently of other transitions
-    if (this.activePrismPush) {
-      this.activePrismPush.update();
-      if (this.activePrismPush.isComplete) {
-        this.activePrismPush = null;
-      }
-    }
-
-    // Camera transitions (used for project view navigation)
-    if (this.activeTransition) {
-      this.activeTransition.update();
-      if (this.activeTransition.isComplete) {
-        this.activeTransition = null;
-
-        if (this.pendingProjectBack) {
-          // Camera returned to grid — clean up project view, re-enable grid
-          this.pendingProjectBack = false;
-          if (this.activeProjectView) {
-            this.activeProjectView.dispose();
-            this.remove(this.activeProjectView);
-            this.activeProjectView = null;
-          }
-          this.activeProjectCell = null;
-          if (this.activeCategory) {
-            const grid = this.categoryViews.get(this.activeCategory);
-            grid?.enableInput();
-          }
-          this.backButton.enable();
-          this.settle();
-        } else if (this.activeProjectView) {
-          // Camera arrived at project
-          this.settle();
-        } else {
-          // Camera returned home
-          setInputEnabled(true);
-          this.settle();
-        }
+    // Drive grid tunnel transition (category ↔ project)
+    if (this.activeGridTunnel) {
+      this.activeGridTunnel.update();
+      if (this.activeGridTunnel.isComplete) {
+        this.onGridTunnelComplete();
       }
     }
 
