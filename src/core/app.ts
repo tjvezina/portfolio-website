@@ -142,7 +142,7 @@ export default class App {
   }
 
   load(): void {
-    new FontLoader().load('./assets/fonts/syntha/Syntha.json', font => {
+    new FontLoader().load('/assets/fonts/syntha/Syntha.json', font => {
       this.synthaFont = font;
 
       // TODO: Init scene after all assets are loaded

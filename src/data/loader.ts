@@ -1,5 +1,10 @@
 import { CategoryData, ProjectArea, ProjectData } from '@/data/types';
 
+/** Ensure an asset path is absolute so it resolves correctly on nested routes. */
+function absPath(path: string): string {
+  return path.startsWith('/') ? path : `/${path}`;
+}
+
 function loadCategory(
   context: __WebpackModuleApi.RequireContext,
   orderContext: __WebpackModuleApi.RequireContext,
@@ -10,7 +15,11 @@ function loadCategory(
     .map((key) => {
       const mod = context(key);
       // webpack may wrap JSON as { default: ... } or return directly — handle both
-      return (mod.default ?? mod) as ProjectData;
+      const project = (mod.default ?? mod) as ProjectData;
+      // Normalize asset paths to absolute
+      if (project.thumbnail) project.thumbnail = absPath(project.thumbnail);
+      if (project.screenshots) project.screenshots = project.screenshots.map(absPath);
+      return project;
     });
 
   let order: string[] = [];
