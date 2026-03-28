@@ -51,6 +51,7 @@ export default class ViewManager extends Object3D {
   private clickedProjectCol: number | null = null;
   private clickedProjectRow: number | null = null;
   private preProjectCameraPos: Vector3 | null = null;
+  private projectSquare: Wireframe | null = null;
 
   /** In-scene back navigation button */
   private backButton: BackButton;
@@ -325,6 +326,7 @@ export default class ViewManager extends Object3D {
       this.clickedProjectCol = null;
       this.clickedProjectRow = null;
       this.preProjectCameraPos = null;
+      this.projectSquare = null;
       const grid = this.categoryViews.get(this.activeCategory!);
       grid?.enableInput();
       this.backButton.enable();
@@ -340,6 +342,7 @@ export default class ViewManager extends Object3D {
         if (prism?.originalWireframe) {
           grid.remove(prism.wireframe);
           this.add(prism.wireframe);
+          this.projectSquare = prism.wireframe as Wireframe;
         }
         grid.visible = false;
       }
@@ -466,6 +469,7 @@ export default class ViewManager extends Object3D {
     grid.visible = false;
 
     this.viewingProject = true;
+    this.projectSquare = square;
   }
 
   onCameraSwapped(matchPlaneLocalZ: number): void {
@@ -478,6 +482,21 @@ export default class ViewManager extends Object3D {
 
   onWindowResized(): void {
     this.backButton.updatePosition();
+
+    // Reposition the project square to the updated content area
+    if (this.viewingProject && this.projectSquare && !this.activeGridTunnel) {
+      const grid = this.categoryViews.get(this.activeCategory!);
+      if (grid) {
+        const target = computeFlyTarget(grid.cellSize);
+        this.projectSquare.position.x = target.x;
+        this.projectSquare.position.y = target.y;
+      }
+    }
+
+    // Update the in-flight target during a transition
+    if (this.activeGridTunnel) {
+      this.activeGridTunnel.onWindowResized();
+    }
   }
 
   update(): void {

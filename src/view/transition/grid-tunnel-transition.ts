@@ -1,6 +1,6 @@
 import { Object3D, PlaneGeometry, Vector3 } from 'three';
 
-import App from '@/core/app';
+import App, { HOME_AREA_WIDTH } from '@/core/app';
 import Wireframe from '@/objects/wireframe';
 import CategoryGridView, { PRISM_DEPTH, PrismData } from '@/view/category-grid-view';
 
@@ -151,6 +151,17 @@ export default class GridTunnelTransition {
   dispose(): void {
     if (this.swapped) {
       this.performSwapBack();
+    }
+  }
+
+  /** Recalculate positions when the window is resized mid-transition. */
+  onWindowResized(): void {
+    const target = this.computeTopLeftTarget();
+    if (!this.reverse && this.flyStarted) {
+      this.flyTargetPos.copy(target);
+    } else if (this.reverse) {
+      this.selectedReverseStartPos.x = target.x;
+      this.selectedReverseStartPos.y = target.y;
     }
   }
 
@@ -363,18 +374,20 @@ export default class GridTunnelTransition {
   }
 }
 
-/** Compute the top-left screen position in world coordinates at the grid plane. */
+/** Compute the top-left content-area position in world coordinates at the grid plane. */
 export function computeFlyTarget(cellSize: number): Vector3 {
   const cameraWorldZ = App.cameraRig.position.z + App.perspCamera.position.z;
   const targetZ = 0;
   const distance = cameraWorldZ - targetZ;
   const halfFovRad = App.perspCamera.fov * Math.PI / 360;
   const visibleHalfHeight = distance * Math.tan(halfFovRad);
-  const visibleHalfWidth = visibleHalfHeight * App.perspCamera.aspect;
+
+  // Content area: full visible height, but horizontally capped to the safe area
+  const contentHalfWidth = HOME_AREA_WIDTH / 2;
 
   const margin = cellSize * 1.1;
   return new Vector3(
-    App.cameraRig.position.x - visibleHalfWidth + margin,
+    App.cameraRig.position.x - contentHalfWidth + margin,
     App.cameraRig.position.y + visibleHalfHeight - margin,
     targetZ,
   );
