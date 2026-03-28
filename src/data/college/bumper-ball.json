@@ -1,7 +1,7 @@
 {
   "slug": "bumper-ball",
   "title": "Bumper Ball",
-  "description": "I wanted to make a classic brick break type game (I loved DX-BALL 2 as a kid), but with **physics** like a pinball machine. That lead to Bumper Ball—you get a heavy chrome ball, a bumper paddle to throw it around with, and a series of levels full of round pegs to break!\n\n![](assets/projects/college/bumper-ball/screenshot-2.png)![](assets/projects/college/bumper-ball/screenshot-1.png)![](assets/projects/college/bumper-ball/screenshot-3.png)![](assets/projects/college/bumper-ball/screenshot-4.png)",
+  "description": "I wanted to make a classic brick break type game (I loved DX-BALL 2 as a kid), but with **physics** like a pinball machine. That led to Bumper Ball—you get a heavy chrome ball, a bumper paddle to throw it around with, and a series of levels full of round pegs to break!\n\n![](assets/projects/college/bumper-ball/screenshot-2.png)![](assets/projects/college/bumper-ball/screenshot-1.png)![](assets/projects/college/bumper-ball/screenshot-3.png)![](assets/projects/college/bumper-ball/screenshot-4.png)",
   "year": "2012",
   "tags": [
     "C++",
