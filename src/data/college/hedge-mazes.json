@@ -1,13 +1,12 @@
 {
   "slug": "hedge-mazes",
   "title": "Hedge Mazes",
+  "description": "One of my first college projects, from the early days of building Windows console apps with C++.\n\n![](assets/projects/college/hedge-mazes/screenshot-2.png)![](assets/projects/college/hedge-mazes/screenshot-3.png)![](assets/projects/college/hedge-mazes/screenshot-1.png)![](assets/projects/college/hedge-mazes/screenshot-4.png)![](assets/projects/college/hedge-mazes/screenshot-5.png)",
   "year": 2010,
-  "thumbnail": "assets/projects/college/hedge-mazes/thumbnail.png",
-  "screenshots": [
-    "assets/projects/college/hedge-mazes/screenshot-2.png",
-    "assets/projects/college/hedge-mazes/screenshot-3.png",
-    "assets/projects/college/hedge-mazes/screenshot-1.png",
-    "assets/projects/college/hedge-mazes/screenshot-4.png",
-    "assets/projects/college/hedge-mazes/screenshot-5.png"
-  ]
+  "tags": [
+    "C++",
+    "Windows Console"
+  ],
+  "playUrl": "https://tjvezina.github.io/cmd-emulator/hedge-mazes/",
+  "thumbnail": "assets/projects/college/hedge-mazes/thumbnail.png"
 }

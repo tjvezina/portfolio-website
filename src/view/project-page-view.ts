@@ -61,17 +61,6 @@ export default class ProjectPageView extends Object3D {
       yOffset -= 0.8;
     }
 
-    // Screenshots — wireframe-bordered placeholder planes (texture loading deferred)
-    if (project.screenshots) {
-      for (let i = 0; i < project.screenshots.length; i++) {
-        const plane = new PlaneGeometry(3, 2);
-        const border = new Wireframe(plane, { color, type: WireframeType.Hollow });
-        border.position.set(-1.5, yOffset - 1, 0);
-        this.add(border);
-        yOffset -= 2.5;
-      }
-    }
-
     // Action buttons
     if (project.playUrl) {
       const playBtn = this.createButton('PLAY', color);
@@ -81,12 +70,6 @@ export default class ProjectPageView extends Object3D {
       yOffset -= 0.8;
     }
 
-    if (project.sourceUrl) {
-      const sourceBtn = this.createButton('SOURCE', color);
-      sourceBtn.position.set(-3, yOffset, 0);
-      sourceBtn.userData.url = project.sourceUrl;
-      this.add(sourceBtn);
-    }
   }
 
   private createButton(label: string, color: NeonColor): Object3D {

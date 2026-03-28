@@ -698,8 +698,9 @@ export default class CategoryGridView extends Object3D {
     const project = this.projectMap.get(key);
     const prismData: PrismData = { wireframe: prism, col, row, cx, cy, project };
 
-    if (project?.thumbnail) {
+    if (project) {
       // Thumbnail texture on front face (starts invisible, fades in when loaded)
+      const thumbnailSrc = project.thumbnail ?? '/assets/default-thumbnail.png';
       const thumbnailGeo = new PlaneGeometry(cs, cs);
       const thumbnailMat = new MeshBasicMaterial({ transparent: true, opacity: 0 });
       const thumbnailMesh = new Mesh(thumbnailGeo, thumbnailMat);
@@ -707,7 +708,7 @@ export default class CategoryGridView extends Object3D {
       prism.add(thumbnailMesh);
       prismData.thumbnailMesh = thumbnailMesh;
 
-      this.textureLoader.load(project.thumbnail, (texture) => {
+      this.textureLoader.load(thumbnailSrc, (texture) => {
         texture.colorSpace = SRGBColorSpace;
         thumbnailMat.map = texture;
         thumbnailMat.needsUpdate = true;

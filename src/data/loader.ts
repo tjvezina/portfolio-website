@@ -18,7 +18,6 @@ function loadCategory(
       const project = (mod.default ?? mod) as ProjectData;
       // Normalize asset paths to absolute
       if (project.thumbnail) project.thumbnail = absPath(project.thumbnail);
-      if (project.screenshots) project.screenshots = project.screenshots.map(absPath);
       return project;
     });
 

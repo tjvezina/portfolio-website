@@ -2,9 +2,5 @@
   "slug": "coils-nodes",
   "title": "Coils & Nodes",
   "thumbnail": "assets/projects/college/coils-nodes/thumbnail.png",
-  "screenshots": [
-    "assets/projects/college/coils-nodes/screenshot-1.png",
-    "assets/projects/college/coils-nodes/screenshot-3.png",
-    "assets/projects/college/coils-nodes/screenshot-2.png"
-  ]
+  "description": "![](assets/projects/college/coils-nodes/screenshot-1.png)\n\n![](assets/projects/college/coils-nodes/screenshot-3.png)\n\n![](assets/projects/college/coils-nodes/screenshot-2.png)"
 }

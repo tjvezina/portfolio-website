@@ -115,6 +115,35 @@ function parseMultipart(req: import('http').IncomingMessage): Promise<ParsedUplo
   });
 }
 
+/** Extract all image paths from markdown text (matches ![...](path) syntax). */
+function extractImagePaths(markdown: string): Set<string> {
+  const paths = new Set<string>();
+  const re = /!\[[^\]]*\]\(([^)]+)\)/g;
+  let match;
+  while ((match = re.exec(markdown)) !== null) {
+    // Strip leading slash if present (editor uses /assets/... but JSON stores assets/...)
+    paths.add(match[1].replace(/^\//, ''));
+  }
+  return paths;
+}
+
+/** Delete image files that were removed from the description. */
+function cleanupOrphanedImages(
+  oldDescription: string | undefined,
+  newDescription: string | undefined,
+): void {
+  const oldPaths = extractImagePaths(oldDescription ?? '');
+  const newPaths = extractImagePaths(newDescription ?? '');
+  for (const p of oldPaths) {
+    if (!newPaths.has(p)) {
+      const absPath = path.join(REPO_ROOT, p);
+      if (fs.existsSync(absPath)) {
+        fs.unlinkSync(absPath);
+      }
+    }
+  }
+}
+
 export default function editorApiPlugin(): Plugin {
   return {
     name: 'editor-api',
@@ -242,6 +271,7 @@ export default function editorApiPlugin(): Plugin {
         if (req.method === 'PUT' && slug) {
           const filePath = path.join(categoryDir, `${slug}.json`);
           if (!fs.existsSync(filePath)) return sendError(res, 404, 'Project not found');
+          const oldProject = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
           let body: Record<string, unknown>;
           try { body = JSON.parse(await parseBody(req)); }
           catch { return sendError(res, 400, 'Invalid JSON body'); }
@@ -263,10 +293,8 @@ export default function editorApiPlugin(): Plugin {
               if (typeof body.thumbnail === 'string') {
                 body.thumbnail = body.thumbnail.replace(oldPrefix, newPrefix);
               }
-              if (Array.isArray(body.screenshots)) {
-                body.screenshots = body.screenshots.map((s: string) =>
-                  s.replace(oldPrefix, newPrefix),
-                );
+              if (typeof body.description === 'string') {
+                body.description = (body.description as string).replaceAll(oldPrefix, newPrefix);
               }
             }
 
@@ -276,6 +304,17 @@ export default function editorApiPlugin(): Plugin {
             if (idx !== -1) order[idx] = newSlug;
             writeOrder(category, order);
           }
+
+          // Clean up images removed from the description.
+          // After a slug rename, oldProject still has old paths while body has new paths,
+          // but the files have already been moved — so rewrite old paths to match.
+          let oldDesc = oldProject.description as string | undefined;
+          if (newSlug !== slug && oldDesc) {
+            const oldPrefix = `assets/projects/${category}/${slug}/`;
+            const newPrefix = `assets/projects/${category}/${newSlug}/`;
+            oldDesc = oldDesc.replaceAll(oldPrefix, newPrefix);
+          }
+          cleanupOrphanedImages(oldDesc, body.description as string | undefined);
 
           const targetPath = path.join(categoryDir, `${newSlug}.json`);
           fs.writeFileSync(targetPath, JSON.stringify(body, null, 2) + '\n');

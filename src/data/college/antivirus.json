@@ -2,10 +2,5 @@
   "slug": "antivirus",
   "title": "Antivirus",
   "thumbnail": "assets/projects/college/antivirus/thumbnail.png",
-  "screenshots": [
-    "assets/projects/college/antivirus/screenshot-3.png",
-    "assets/projects/college/antivirus/screenshot-4.png",
-    "assets/projects/college/antivirus/screenshot-2.png",
-    "assets/projects/college/antivirus/screenshot-1.png"
-  ]
+  "description": "![](assets/projects/college/antivirus/screenshot-3.png)\n\n![](assets/projects/college/antivirus/screenshot-4.png)\n\n![](assets/projects/college/antivirus/screenshot-2.png)\n\n![](assets/projects/college/antivirus/screenshot-1.png)"
 }

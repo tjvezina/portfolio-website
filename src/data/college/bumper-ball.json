@@ -2,11 +2,5 @@
   "slug": "bumper-ball",
   "title": "Bumper Ball",
   "thumbnail": "assets/projects/college/bumper-ball/thumbnail.png",
-  "screenshots": [
-    "assets/projects/college/bumper-ball/screenshot-2.png",
-    "assets/projects/college/bumper-ball/screenshot-1.png",
-    "assets/projects/college/bumper-ball/screenshot-3.png",
-    "assets/projects/college/bumper-ball/screenshot-4.png",
-    "assets/projects/college/bumper-ball/screenshot-5.png"
-  ]
+  "description": "![](assets/projects/college/bumper-ball/screenshot-2.png)\n\n![](assets/projects/college/bumper-ball/screenshot-1.png)\n\n![](assets/projects/college/bumper-ball/screenshot-3.png)\n\n![](assets/projects/college/bumper-ball/screenshot-4.png)\n\n![](assets/projects/college/bumper-ball/screenshot-5.png)"
 }

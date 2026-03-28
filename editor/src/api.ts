@@ -5,9 +5,7 @@ export interface ProjectData {
   title: string;
   thumbnail?: string;
   description?: string;
-  screenshots?: string[];
   playUrl?: string;
-  sourceUrl?: string;
   tags?: string[];
   year?: number;
 }
