@@ -1,12 +1,21 @@
 {
   "slug": "hedge-mazes",
   "title": "Hedge Mazes",
-  "description": "One of my first college projects, from the early days of building Windows console apps with C++.\n\n![](assets/projects/college/hedge-mazes/screenshot-2.png)![](assets/projects/college/hedge-mazes/screenshot-3.png)![](assets/projects/college/hedge-mazes/screenshot-1.png)![](assets/projects/college/hedge-mazes/screenshot-4.png)![](assets/projects/college/hedge-mazes/screenshot-5.png)",
-  "year": 2010,
+  "description": "One of my first college projects, from the early days of building Windows console apps with C++.\n\nThis was a change to learn about and implement a **maze-generation** algorithm, as well as play with rendering, controls, collectables, and level progression.\n\n![](assets/projects/college/hedge-mazes/screenshot-2.png)![](assets/projects/college/hedge-mazes/screenshot-3.png)![](assets/projects/college/hedge-mazes/screenshot-1.png)I revisited the project two years later, this time with a proper square grid and a cheap **fog of war** effect by rendering a circle around the player each move, which leaves a dim map of where you've been behind.\n\n![](assets/projects/college/hedge-mazes/screenshot-4.png)![](assets/projects/college/hedge-mazes/screenshot-5.png)In 2022, I built a small Windows [command prompt emulator](https://github.com/tjvezina/cmd-emulator) in **p5.js** so I could recreate this and other projects in a web context, and keep them alive and playable for longer.",
+  "year": "2010, 2012",
   "tags": [
     "C++",
     "Windows Console"
   ],
-  "playUrl": "https://tjvezina.github.io/cmd-emulator/hedge-mazes/",
+  "playUrls": [
+    {
+      "name": "Hedge Mazes",
+      "url": "https://tjvezina.github.io/cmd-emulator/hedge-mazes/"
+    },
+    {
+      "name": "Hedge Mazes 2.0",
+      "url": "https://tjvezina.github.io/cmd-emulator/hedge-mazes-2.0/"
+    }
+  ],
   "thumbnail": "assets/projects/college/hedge-mazes/thumbnail.png"
 }

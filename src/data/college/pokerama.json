@@ -1,6 +1,17 @@
 {
   "slug": "pokerama",
   "title": "Pokerama",
-  "thumbnail": "assets/projects/college/pokerama/thumbnail.png",
-  "description": "![](assets/projects/college/pokerama/screenshot-1.png)"
+  "description": "A common first-semester assignment was to make a card game like blackjack, so I developed a system for rendering playing cards and used it in several projects, including this poker game.\n\nThis one includes some lines and colors to make the space feel more 3D.\n\n![](assets/projects/college/pokerama/screenshot-1.png)In 2022, I built a small Windows [command prompt emulator](https://github.com/tjvezina/cmd-emulator) in **p5.js** so I could recreate this and other projects in a web context, and keep them alive and playable for longer.",
+  "year": "2010",
+  "tags": [
+    "C++",
+    "Windows Console"
+  ],
+  "playUrls": [
+    {
+      "name": "",
+      "url": "https://tjvezina.github.io/cmd-emulator/pokerama/"
+    }
+  ],
+  "thumbnail": "assets/projects/college/pokerama/thumbnail.png"
 }

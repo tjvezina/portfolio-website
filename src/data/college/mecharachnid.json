@@ -1,6 +1,12 @@
 {
   "slug": "mecharachnid",
   "title": "Mecharachnid",
-  "thumbnail": "assets/projects/college/mecharachnid/thumbnail.png",
-  "description": "![](assets/projects/college/mecharachnid/screenshot-4.png)\n\n![](assets/projects/college/mecharachnid/screenshot-2.png)\n\n![](assets/projects/college/mecharachnid/screenshot-3.png)\n\n![](assets/projects/college/mecharachnid/screenshot-5.png)"
+  "description": "This was a very early experiment with **shaders**! I modelled a mechanical spider based on the one in Wild Wild West, and later a more simplified geometric version to play with in this demo scene.\n\n![](assets/projects/college/mecharachnid/screenshot-4.png)Half the fun was playing with **inverse kinematics**, so you could control the spider with arrow keys, but the eight legs would move dynamically in response.\n\n![](assets/projects/college/mecharachnid/screenshot-2.png)These screenshots show various debug views, like lights, mesh normals, and depth maps.\n\n![](assets/projects/college/mecharachnid/screenshot-3.png)![](assets/projects/college/mecharachnid/screenshot-5.png)",
+  "year": 2012,
+  "tags": [
+    "C#",
+    "XNA",
+    "HLSL"
+  ],
+  "thumbnail": "assets/projects/college/mecharachnid/thumbnail.png"
 }

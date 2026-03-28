@@ -1,6 +1,19 @@
 {
   "slug": "coils-nodes",
   "title": "Coils & Nodes",
-  "thumbnail": "assets/projects/college/coils-nodes/thumbnail.png",
-  "description": "![](assets/projects/college/coils-nodes/screenshot-1.png)\n\n![](assets/projects/college/coils-nodes/screenshot-3.png)\n\n![](assets/projects/college/coils-nodes/screenshot-2.png)"
+  "description": "After building Bumper Ball, I used the same framework to make a puzzle game, where you have to shuffle boxes around to leave a clear path for electricity to connect all the nodes.\n\n![](assets/projects/college/coils-nodes/screenshot-1.png)This made use of good old **A\\* pathfinding** to connect the nodes dynamically. Creating all the assets was really fun.\n\n![](assets/projects/college/coils-nodes/screenshot-3.png)![](assets/projects/college/coils-nodes/screenshot-2.png)After the game was finished, I ported the whole thing to Windows Phone using XNA, and added touch controls, so it could be played on mobile too!\n\n![](/assets/projects/college/coils-nodes/screenshot-4.png)In 2022, I ported the original project to web with **p5.js** to keep it alive and playable longer.",
+  "year": "2012",
+  "tags": [
+    "C++",
+    "OpenGL",
+    "C#",
+    "XNA"
+  ],
+  "playUrls": [
+    {
+      "name": "",
+      "url": "https://tjvezina.github.io/coils-and-nodes-js"
+    }
+  ],
+  "thumbnail": "assets/projects/college/coils-nodes/thumbnail.png"
 }

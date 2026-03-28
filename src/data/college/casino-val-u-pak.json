@@ -1,6 +1,17 @@
 {
   "slug": "casino-val-u-pak",
   "title": "CASINO VAL-U-PAK",
-  "thumbnail": "assets/projects/college/casino-val-u-pak/thumbnail.png",
-  "description": "![](assets/projects/college/casino-val-u-pak/screenshot-2.png)"
+  "description": "This was the culmination of all my console card game projects, a single \"casino\" game with account management, a persistent bank balance, and four games to play: Blackjack, Go Fish, Craps, and Irish Snap.\n\nFeatures music and sound effects!\n\n![](/assets/projects/college/casino-val-u-pak/screenshot-3.png)![](/assets/projects/college/casino-val-u-pak/screenshot-4.png)![](/assets/projects/college/casino-val-u-pak/screenshot-5.png)![](/assets/projects/college/casino-val-u-pak/screenshot-6.png)In 2022, I built a small Windows [command prompt emulator](https://github.com/tjvezina/cmd-emulator) in **p5.js** so I could recreate this and other projects in a web context, and keep them alive and playable for longer.",
+  "year": "2010",
+  "tags": [
+    "C++",
+    "Windows Console"
+  ],
+  "playUrls": [
+    {
+      "name": "",
+      "url": "https://tjvezina.github.io/cmd-emulator/casino-val-u-pak/"
+    }
+  ],
+  "thumbnail": "assets/projects/college/casino-val-u-pak/thumbnail.png"
 }
