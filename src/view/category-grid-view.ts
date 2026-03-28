@@ -6,6 +6,7 @@ import { getCategoryData } from '@/data/loader';
 import { ProjectArea, ProjectData } from '@/data/types';
 import Text from '@/objects/text';
 import Wireframe from '@/objects/wireframe';
+import { fitText } from '@/utils/text-utils';
 
 /** How far (Chebyshev distance) the grid extends from the center cell. */
 const MAX_GRID_RADIUS = 8;
@@ -92,54 +93,6 @@ const COLLEGE_COORDS: [number, number][] = [
   [-1, 0], [0, 0], [1, 0],
   [-1, -1], [0, -1], [1, -1],
 ];
-
-interface FontGlyphData {
-  resolution: number;
-  glyphs: Record<string, { ha: number }>;
-}
-
-function measureTextWidth(text: string, size: number): number {
-  const { resolution, glyphs } = App.synthaFont.data as unknown as FontGlyphData;
-  const scale = size / resolution;
-  let width = 0;
-  for (const char of text) {
-    const glyph = glyphs[char];
-    if (glyph) width += glyph.ha * scale;
-  }
-  return width;
-}
-
-function wrapText(text: string, size: number, maxWidth: number): string[] {
-  const words = text.split(' ');
-  const lines: string[] = [];
-  let currentLine = '';
-  for (const word of words) {
-    const testLine = currentLine ? `${currentLine} ${word}` : word;
-    if (measureTextWidth(testLine, size) > maxWidth && currentLine) {
-      lines.push(currentLine);
-      currentLine = word;
-    } else {
-      currentLine = testLine;
-    }
-  }
-  if (currentLine) lines.push(currentLine);
-  return lines;
-}
-
-/** Wrap text and reduce font size if any line still overflows maxWidth. */
-function fitText(text: string, preferredSize: number, maxWidth: number): { lines: string[]; size: number } {
-  let size = preferredSize;
-  for (let i = 0; i < 5; i++) {
-    const lines = wrapText(text, size, maxWidth);
-    let widest = 0;
-    for (const line of lines) {
-      widest = Math.max(widest, measureTextWidth(line, size));
-    }
-    if (widest <= maxWidth) return { lines, size };
-    size *= maxWidth / widest;
-  }
-  return { lines: wrapText(text, size, maxWidth), size };
-}
 
 export default class CategoryGridView extends Object3D {
   area: ProjectArea;

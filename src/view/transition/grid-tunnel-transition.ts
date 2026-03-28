@@ -28,9 +28,6 @@ const TUNNEL_DURATION = 2.0;
 /** How far forward non-selected prisms travel during tunnel. */
 export const TUNNEL_DISTANCE = 25;
 
-/** How far the selected cell recedes during the tunnel phase (linear). */
-const SELECTED_RECEDE_TUNNEL = 5;
-
 /** Duration for the selected square to fly to the top-left of the screen. */
 const FLY_DURATION = 1.0;
 
@@ -60,6 +57,7 @@ export default class GridTunnelTransition {
 
   private _isComplete = false;
   get isComplete(): boolean { return this._isComplete; }
+  get isFlyPhaseActive(): boolean { return this.flyStarted; }
 
   // Grid reference
   private grid: CategoryGridView;
@@ -96,13 +94,18 @@ export default class GridTunnelTransition {
   private selectedReverseStartPos = new Vector3();
   private otherReverseStartZ = 0;
 
+  // Scale animation during fly
+  private flyTargetScale: number;
+
   constructor(
     grid: CategoryGridView,
     selectedCol: number,
     selectedRow: number,
     reverse: boolean,
     cameraHomePos?: Vector3,
+    flyTargetScale = 1,
   ) {
+    this.flyTargetScale = flyTargetScale;
     this.reverse = reverse;
     this.grid = grid;
     this.baseZ = -PRISM_DEPTH / 2;
@@ -206,13 +209,13 @@ export default class GridTunnelTransition {
       this.otherObjs[i].position.z = settled + tunnelOffset;
     }
 
-    // --- Selected cell: recede + separation check + fly ---
+    // --- Selected cell: stays in place, separation check + fly ---
     if (!this.flyStarted) {
       const ss = this.selectedSettleStartZ;
       const selectedSettled = ss + (this.baseZ - ss) * settleE;
-      const prismCenterZ = selectedSettled - SELECTED_RECEDE_TUNNEL * tunnelT;
+      const prismCenterZ = selectedSettled; // no recede — front face stays at z=0
 
-      // Check separation: selected front face clears other prisms' back face
+      // Check separation: other prisms' back face clears selected front face
       const frontFaceZ = prismCenterZ + PRISM_DEPTH / 2;
       const idealOtherZ = this.baseZ + tunnelOffset;
       const otherBack = idealOtherZ - PRISM_DEPTH / 2;
@@ -242,6 +245,9 @@ export default class GridTunnelTransition {
       const ft = Math.min(1, this.flyElapsed / FLY_DURATION);
       const fe = easeInOutCubic(ft);
       this.selectedObj.position.lerpVectors(this.flyStartPos, this.flyTargetPos, fe);
+      if (this.flyTargetScale !== 1) {
+        this.selectedObj.scale.setScalar(1 + (this.flyTargetScale - 1) * fe);
+      }
     }
 
     // Done when tunnel complete AND fly complete
@@ -279,6 +285,11 @@ export default class GridTunnelTransition {
       + (targetY - this.selectedReverseStartPos.y) * riseE;
     this.selectedObj.position.z = this.selectedReverseStartPos.z
       + (targetZ - this.selectedReverseStartPos.z) * riseE;
+    if (this.flyTargetScale !== 1) {
+      this.selectedObj.scale.setScalar(
+        this.flyTargetScale + (1 - this.flyTargetScale) * riseE,
+      );
+    }
 
     // Swap back to prism when fly-back completes
     if (riseT >= 1 && this.swapped) {
@@ -301,6 +312,7 @@ export default class GridTunnelTransition {
       if (this.swapped) this.performSwapBack();
       for (const obj of this.otherObjs) obj.position.z = this.baseZ;
       this.selectedObj.position.set(this.selectedOriginalX, this.selectedOriginalY, this.baseZ);
+      this.selectedObj.scale.setScalar(1);
       App.cameraRig.position.copy(this.cameraHomePos);
       this._isComplete = true;
     }
@@ -372,6 +384,13 @@ export default class GridTunnelTransition {
   private computeTopLeftTarget(): Vector3 {
     return computeFlyTarget(this.grid.cellSize);
   }
+}
+
+/** Compute the visible half-height at z=0 in world coordinates. */
+export function computeVisibleHalfHeight(): number {
+  const cameraWorldZ = App.cameraRig.position.z + App.perspCamera.position.z;
+  const halfFovRad = App.perspCamera.fov * Math.PI / 360;
+  return cameraWorldZ * Math.tan(halfFovRad);
 }
 
 /** Compute the top-left content-area position in world coordinates at the grid plane. */

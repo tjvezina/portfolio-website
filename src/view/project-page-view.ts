@@ -1,95 +1,661 @@
-import { BufferGeometry, Material, Mesh, Object3D, PlaneGeometry } from 'three';
+import {
+  BufferGeometry, Material, Mesh, MeshBasicMaterial, Object3D,
+  PlaneGeometry, Shape, ShapeGeometry, SRGBColorSpace, TextureLoader,
+} from 'three';
 
-import App from '@/core/app';
+import App, { HOME_AREA_WIDTH } from '@/core/app';
+import { BLOOM_LAYER } from '@/core/layers';
 import { NeonColor } from '@/core/neon-color';
 import { ProjectData } from '@/data/types';
-import Text, { TextAlignX } from '@/objects/text';
+import Text, { TextAlignX, TextAlignY } from '@/objects/text';
 import Wireframe, { WireframeType } from '@/objects/wireframe';
+import { generateCharShapes, measureLineHeight, measureTextWidth, wrapText } from '@/utils/text-utils';
+
+// --- Description parsing types ---
+
+type InlineRun =
+  | { type: 'text', text: string }
+  | { type: 'link', text: string, url: string }
+
+type ContentBlock =
+  | { type: 'paragraph', runs: InlineRun[] }
+  | { type: 'image', src: string }
+
+type ClickTarget = {
+  mesh: Mesh,
+  url: string,
+}
+
+type Word = {
+  text: string,
+  run: InlineRun,
+  bold: boolean,
+}
+
+type AnimatedChar = {
+  container: Object3D,
+  materials: MeshBasicMaterial[],
+  baseY: number,
+  index: number,
+}
+
+// --- Layout constants ---
+
+const TITLE_SIZE = 0.3;
+const META_SIZE = 0.2;
+const TAG_SIZE = 0.18;
+const DESC_SIZE = 0.18;
+const BUTTON_TEXT_SIZE = 0.17;
+const LINE_HEIGHT_FACTOR = 1.5;
+const DESC_LINE_HEIGHT_FACTOR = 1.5;
+const SECTION_GAP = 0.5;
+const PARAGRAPH_GAP = 0.35;
+const IMAGE_ASPECT = 16 / 9;
+export const THUMBNAIL_SCALE = 0.75;
+const BUTTON_PADDING_X = 0.2;
+const BUTTON_PADDING_Y = 0.12;
+const BUTTON_GAP = 0.3;
+const BUTTON_CORNER_RADIUS = 0.12;
+const BUTTON_HOVER_SCALE = 1.06;
+const BUTTON_PRESS_SCALE = 0.94;
+
+type PlayButton = {
+  container: Object3D,
+  hitArea: Mesh,
+}
+
+function createRoundedRectShape(
+  width: number,
+  height: number,
+  radius: number,
+): Shape {
+  const shape = new Shape();
+  const hw = width / 2;
+  const hh = height / 2;
+  const r = Math.min(radius, hw, hh);
+  shape.moveTo(-hw + r, -hh);
+  shape.lineTo(hw - r, -hh);
+  shape.quadraticCurveTo(hw, -hh, hw, -hh + r);
+  shape.lineTo(hw, hh - r);
+  shape.quadraticCurveTo(hw, hh, hw - r, hh);
+  shape.lineTo(-hw + r, hh);
+  shape.quadraticCurveTo(-hw, hh, -hw, hh - r);
+  shape.lineTo(-hw, -hh + r);
+  shape.quadraticCurveTo(-hw, -hh, -hw + r, -hh);
+  return shape;
+}
 
 export default class ProjectPageView extends Object3D {
-  project: ProjectData;
+  private _contentHeight = 0;
+  get contentHeight(): number { return this._contentHeight; }
 
-  constructor(project: ProjectData, color: NeonColor) {
+  private clickTargets: ClickTarget[] = [];
+  private clickHandler: () => void;
+  private playButtons: PlayButton[] = [];
+  private animatedChars: AnimatedChar[] = [];
+  private isPointerDown = false;
+  private pointerDownHandler: () => void;
+  private pointerUpHandler: () => void;
+  private textureLoader = new TextureLoader();
+  private imageDims: Map<string, number>;
+
+  /** Preload image dimensions, then construct the view with correct layout. */
+  static async create(
+    project: ProjectData,
+    color: NeonColor,
+    cellSize: number,
+  ): Promise<ProjectPageView> {
+    const urls = ProjectPageView.extractImageUrls(project.description ?? '');
+    const dims = urls.length > 0
+      ? await ProjectPageView.preloadImageDims(urls)
+      : new Map<string, number>();
+    return new ProjectPageView(project, color, cellSize, dims);
+  }
+
+  private static extractImageUrls(description: string): string[] {
+    const urls: string[] = [];
+    const regex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+    let match;
+    while ((match = regex.exec(description)) !== null) {
+      const raw = match[2];
+      urls.push(raw.startsWith('/') ? raw : `/${raw}`);
+    }
+    return urls;
+  }
+
+  private static preloadImageDims(urls: string[]): Promise<Map<string, number>> {
+    return Promise.all(urls.map(url =>
+      new Promise<[string, number]>((resolve) => {
+        const img = new Image();
+        img.onload = (): void => resolve([url, img.naturalWidth / img.naturalHeight]);
+        img.onerror = (): void => resolve([url, IMAGE_ASPECT]);
+        img.src = url;
+      }),
+    )).then(entries => new Map(entries));
+  }
+
+  constructor(
+    project: ProjectData,
+    color: NeonColor,
+    cellSize: number,
+    imageDims: Map<string, number>,
+  ) {
     super();
-    this.project = project;
+    this.imageDims = imageDims;
 
-    let yOffset = 2;
+    const contentHalfWidth = HOME_AREA_WIDTH / 2;
+    const margin = cellSize * 0.6;
+    const gap = cellSize * 0.15;
 
-    // Title
-    const title = new Text(project.title.toUpperCase(), App.synthaFont, {
-      color,
-      size: 0.3 * App.pixelRatio,
-      alignX: TextAlignX.Left,
-    });
-    title.position.set(-3, yOffset, 0);
-    this.add(title);
-    yOffset -= 1;
+    // Thumbnail visual size after scaling (center stays at fly target position)
+    const thumbVisual = cellSize * THUMBNAIL_SCALE;
+    const thumbTop = -cellSize * 1.1 + thumbVisual / 2;
+    const thumbBottom = -cellSize * 1.1 - thumbVisual / 2;
+    const thumbRight = -contentHalfWidth + cellSize * 1.1 + thumbVisual / 2;
 
-    // Description
-    if (project.description) {
-      const desc = new Text(project.description, App.synthaFont, {
-        color: NeonColor.White,
-        size: 0.12 * App.pixelRatio,
-        alignX: TextAlignX.Left,
-      });
-      desc.position.set(-3, yOffset, 0);
-      this.add(desc);
-      yOffset -= 0.8;
+    // Right area for title/year/tags (left-aligned, vertically centered beside thumbnail)
+    const rightAreaLeft = thumbRight + gap;
+    const rightAreaWidth = (contentHalfWidth - margin) - rightAreaLeft;
+
+    // --- Pre-compute header layout to find total height ---
+    const titleText = project.title.toUpperCase();
+    let titleSize = TITLE_SIZE;
+    const titleWidth = measureTextWidth(titleText, titleSize);
+    if (titleWidth > rightAreaWidth) {
+      titleSize *= rightAreaWidth / titleWidth;
     }
 
-    // Tags
+    const titleAdvance = measureLineHeight(META_SIZE) * LINE_HEIGHT_FACTOR;
+    const tagAdvance = measureLineHeight(TAG_SIZE, App.bookerlyFont) * LINE_HEIGHT_FACTOR;
+
+    let headerAdvance = titleAdvance;
+    if (project.year) headerAdvance += tagAdvance;
+    let tagLines: string[] = [];
     if (project.tags && project.tags.length > 0) {
-      const tagText = new Text(project.tags.join(' \u00B7 '), App.synthaFont, {
-        color,
-        size: 0.1 * App.pixelRatio,
-        alignX: TextAlignX.Left,
-      });
-      tagText.position.set(-3, yOffset, 0);
-      this.add(tagText);
-      yOffset -= 0.6;
+      const tagStr = project.tags.join('  \u00B7  ');
+      tagLines = wrapText(tagStr, TAG_SIZE, rightAreaWidth, App.bookerlyFont);
+      headerAdvance += tagLines.length * tagAdvance;
     }
 
-    // Year
+    // Center the header block vertically between thumbTop and thumbBottom
+    const thumbCenterY = (thumbTop + thumbBottom) / 2;
+    let rightY = thumbCenterY + headerAdvance / 2 + headerAdvance * 0.05;
+
+    // --- Title (single line, shrink to fit) ---
+    const title = new Text(titleText, App.synthaFont, {
+      color,
+      size: titleSize,
+      alignX: TextAlignX.Left,
+      alignY: TextAlignY.Top,
+    });
+    title.position.set(rightAreaLeft, rightY, 0);
+    this.add(title);
+    rightY -= titleAdvance;
+
+    // --- Year ---
     if (project.year) {
-      const yearText = new Text(project.year, App.synthaFont, {
-        color: NeonColor.White,
-        size: 0.1 * App.pixelRatio,
+      const yearObj = new Text(project.year, App.synthaFont, {
+        color,
+        size: META_SIZE,
         alignX: TextAlignX.Left,
+        alignY: TextAlignY.Top,
       });
-      yearText.position.set(-3, yOffset, 0);
-      this.add(yearText);
-      yOffset -= 0.8;
+      yearObj.position.set(rightAreaLeft, rightY, 0);
+      this.add(yearObj);
+      rightY -= tagAdvance;
     }
 
-    // Action buttons
-    if (project.playUrls) {
-      for (const link of project.playUrls) {
-        const btn = this.createButton(link.name.toUpperCase(), color);
-        btn.position.set(-3, yOffset, 0);
-        btn.userData.url = link.url;
-        this.add(btn);
-        yOffset -= 0.8;
+    // --- Tags ---
+    for (const line of tagLines) {
+      const text = new Text(line, App.bookerlyFont, {
+        color,
+        size: TAG_SIZE,
+        alignX: TextAlignX.Left,
+        alignY: TextAlignY.Top,
+      });
+      text.position.set(rightAreaLeft, rightY, 0);
+      this.add(text);
+      rightY -= tagAdvance;
+    }
+
+    // Content below the header row (thumbnail + right-side info)
+    let y = Math.min(thumbBottom, rightY) - SECTION_GAP;
+    const descLeft = -contentHalfWidth + margin;
+    const descWidth = HOME_AREA_WIDTH - margin * 2;
+
+    // --- Play buttons (centered, one per line) ---
+    if (project.playUrls && project.playUrls.length > 0) {
+      const btnHeight = BUTTON_TEXT_SIZE + BUTTON_PADDING_Y * 2;
+
+      for (const playUrl of project.playUrls) {
+        const name = playUrl.name || project.title;
+        const label = `PLAY ${name.toUpperCase()}`;
+        const { button, hitArea } = this.createPlayButton(label, color);
+        button.position.set(0, y - btnHeight / 2, 0);
+        this.add(button);
+        this.clickTargets.push({ mesh: hitArea, url: playUrl.url });
+        this.playButtons.push({ container: button, hitArea });
+        y -= btnHeight + BUTTON_GAP;
+      }
+
+      y += BUTTON_GAP - SECTION_GAP; // replace trailing button gap with section gap
+    }
+
+    // --- Description ---
+    if (project.description) {
+      const blocks = this.parseDescription(project.description);
+
+      for (const block of blocks) {
+        if (block.type === 'paragraph') {
+          y = this.renderParagraph(
+            block.runs, descLeft, y, descWidth, DESC_SIZE, color,
+          );
+          y -= PARAGRAPH_GAP;
+        } else if (block.type === 'image') {
+          y = this.renderImage(block.src, descLeft, y, descWidth);
+          y -= PARAGRAPH_GAP;
+        }
       }
     }
 
+    this._contentHeight = Math.abs(y) + 1.0;
+
+    // Click handler for play buttons and links
+    this.clickHandler = (): void => {
+      for (const target of this.clickTargets) {
+        const intersects = App.raycaster.intersectObject(target.mesh);
+        if (intersects.length > 0) {
+          window.open(target.url, '_blank');
+          return;
+        }
+      }
+    };
+    this.pointerDownHandler = (): void => { this.isPointerDown = true; };
+    this.pointerUpHandler = (): void => { this.isPointerDown = false; };
   }
 
-  private createButton(label: string, color: NeonColor): Object3D {
-    const btn = new Object3D();
-    const bg = new Wireframe(new PlaneGeometry(2, 0.5), { color, type: WireframeType.Hollow });
-    const text = new Text(label, App.synthaFont, { color, size: 0.12 * App.pixelRatio });
-    btn.add(bg, text);
-    return btn;
+  enableInput(): void {
+    window.addEventListener('click', this.clickHandler);
+    window.addEventListener('pointerdown', this.pointerDownHandler);
+    window.addEventListener('pointerup', this.pointerUpHandler);
+  }
+
+  disableInput(): void {
+    window.removeEventListener('click', this.clickHandler);
+    window.removeEventListener('pointerdown', this.pointerDownHandler);
+    window.removeEventListener('pointerup', this.pointerUpHandler);
+    this.isPointerDown = false;
+  }
+
+  update(): void {
+    // Animate bold characters: rainbow hue cycle + sine wave bounce
+    const time = App.clock.elapsedTime;
+    for (const ac of this.animatedChars) {
+      // OKLCH hue cycling: perceptually uniform brightness and saturation
+      const h = -(time * 0.6 - ac.index * 0.1) * Math.PI * 2;
+      const oL = 0.7, oC = 0.2;
+      const oa = oC * Math.cos(h);
+      const ob = oC * Math.sin(h);
+      const l_ = oL + 0.3963377774 * oa + 0.2158037573 * ob;
+      const m_ = oL - 0.1055613458 * oa - 0.0638541728 * ob;
+      const s_ = oL - 0.0894841775 * oa - 1.2914855480 * ob;
+      const l3 = l_ * l_ * l_;
+      const m3 = m_ * m_ * m_;
+      const s3 = s_ * s_ * s_;
+      const r = +4.0767416621 * l3 - 3.3077115913 * m3 + 0.2309699292 * s3;
+      const g = -1.2684380046 * l3 + 2.6097574011 * m3 - 0.3413193965 * s3;
+      const b = -0.0041960863 * l3 - 0.7034186147 * m3 + 1.7076147010 * s3;
+      for (const mat of ac.materials) {
+        mat.color.setRGB(
+          Math.max(0, Math.min(1, r)),
+          Math.max(0, Math.min(1, g)),
+          Math.max(0, Math.min(1, b)),
+        );
+      }
+      ac.container.position.y = ac.baseY +
+        Math.sin(time * 6 - ac.index * 0.3) * 0.012;
+    }
+
+    // Button hover/press
+    for (const btn of this.playButtons) {
+      const hovered = App.pointerActive &&
+        App.raycaster.intersectObject(btn.hitArea).length > 0;
+      const target = hovered
+        ? (this.isPointerDown ? BUTTON_PRESS_SCALE : BUTTON_HOVER_SCALE)
+        : 1;
+      const current = btn.container.scale.x;
+      const next = current + (target - current) *
+        (1 - Math.exp(-15 * App.deltaTime));
+      btn.container.scale.setScalar(next);
+    }
   }
 
   dispose(): void {
+    this.disableInput();
     this.traverse((obj) => {
       if (obj instanceof Mesh) {
         (obj.geometry as BufferGeometry).dispose();
         const mat = obj.material as Material | Material[];
-        if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
-        else mat.dispose();
+        const mats = Array.isArray(mat) ? mat : [mat];
+        for (const m of mats) {
+          if (m instanceof MeshBasicMaterial && m.map) {
+            m.map.dispose();
+          }
+          m.dispose();
+        }
       }
     });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Button creation
+  // ---------------------------------------------------------------------------
+
+  private createPlayButton(
+    label: string,
+    color: NeonColor,
+  ): { button: Object3D, width: number, hitArea: Mesh } {
+    const textWidth = measureTextWidth(label, BUTTON_TEXT_SIZE);
+    const width = textWidth + BUTTON_PADDING_X * 2;
+    const height = BUTTON_TEXT_SIZE + BUTTON_PADDING_Y * 2;
+
+    const btn = new Object3D();
+    const roundedShape = createRoundedRectShape(width, height, BUTTON_CORNER_RADIUS);
+    const border = new Wireframe(
+      new ShapeGeometry(roundedShape),
+      { color, type: WireframeType.Hollow },
+    );
+    const text = new Text(label, App.synthaFont, {
+      color,
+      size: BUTTON_TEXT_SIZE,
+    });
+    btn.add(border, text);
+
+    const hitArea = new Mesh(
+      new PlaneGeometry(width, height),
+      new MeshBasicMaterial({ visible: false }),
+    );
+    btn.add(hitArea);
+
+    return { button: btn, width, hitArea };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Description parsing
+  // ---------------------------------------------------------------------------
+
+  private parseDescription(desc: string): ContentBlock[] {
+    const blocks: ContentBlock[] = [];
+    const imageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+    let lastIndex = 0;
+    let match;
+
+    while ((match = imageRegex.exec(desc)) !== null) {
+      const textBefore = desc.slice(lastIndex, match.index);
+      if (textBefore.trim()) {
+        blocks.push(...this.parseTextBlocks(textBefore));
+      }
+      const rawSrc = match[2];
+      blocks.push({
+        type: 'image',
+        src: rawSrc.startsWith('/') ? rawSrc : `/${rawSrc}`,
+      });
+      lastIndex = match.index + match[0].length;
+    }
+
+    const textAfter = desc.slice(lastIndex);
+    if (textAfter.trim()) {
+      blocks.push(...this.parseTextBlocks(textAfter));
+    }
+
+    return blocks;
+  }
+
+  private parseTextBlocks(text: string): ContentBlock[] {
+    return text.split('\n\n')
+      .map(p => p.replace(/\n/g, ' ').trim())
+      .filter(p => p.length > 0)
+      .map(p => ({ type: 'paragraph' as const, runs: this.parseInlineRuns(p) }));
+  }
+
+  private parseInlineRuns(text: string): InlineRun[] {
+    const runs: InlineRun[] = [];
+    const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+    let lastIndex = 0;
+    let match;
+
+    while ((match = linkRegex.exec(text)) !== null) {
+      if (match.index > lastIndex) {
+        runs.push({ type: 'text', text: text.slice(lastIndex, match.index) });
+      }
+      runs.push({ type: 'link', text: match[1], url: match[2] });
+      lastIndex = match.index + match[0].length;
+    }
+
+    if (lastIndex < text.length) {
+      runs.push({ type: 'text', text: text.slice(lastIndex) });
+    }
+
+    return runs;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Content rendering
+  // ---------------------------------------------------------------------------
+
+  private renderParagraph(
+    runs: InlineRun[],
+    left: number,
+    startY: number,
+    maxWidth: number,
+    size: number,
+    color: NeonColor,
+  ): number {
+    // Build word list with run and bold tracking
+    const words: Word[] = [];
+    for (const run of runs) {
+      const boldRegex = /\*\*(.+?)\*\*/g;
+      let lastIdx = 0;
+      let m;
+      while ((m = boldRegex.exec(run.text)) !== null) {
+        const before = run.text.slice(lastIdx, m.index);
+        for (const part of before.split(/\s+/).filter(w => w.length > 0)) {
+          words.push({ text: part, run, bold: false });
+        }
+        for (const part of m[1].split(/\s+/).filter(w => w.length > 0)) {
+          words.push({ text: part, run, bold: true });
+        }
+        lastIdx = m.index + m[0].length;
+      }
+      const after = run.text.slice(lastIdx);
+      for (const part of after.split(/\s+/).filter(w => w.length > 0)) {
+        words.push({ text: part, run, bold: false });
+      }
+    }
+
+    if (words.length === 0) return startY;
+
+    // Word wrap (using Bookerly font metrics)
+    const font = App.bookerlyFont;
+    const spaceWidth = measureTextWidth(' ', size, font);
+    const lines: Word[][] = [];
+    let currentLine: Word[] = [];
+    let currentWidth = 0;
+
+    for (const word of words) {
+      const wordWidth = measureTextWidth(word.text, size, font);
+      const extraWidth = currentLine.length > 0
+        ? spaceWidth + wordWidth
+        : wordWidth;
+
+      if (currentWidth + extraWidth > maxWidth && currentLine.length > 0) {
+        lines.push(currentLine);
+        currentLine = [word];
+        currentWidth = wordWidth;
+      } else {
+        currentLine.push(word);
+        currentWidth += extraWidth;
+      }
+    }
+    if (currentLine.length > 0) lines.push(currentLine);
+
+    // Render each line using per-character shapes for justified alignment.
+    // Generates shapes at origin per character, then positions each at a computed
+    // x offset with extra space distributed evenly at word boundaries.
+    let y = startY;
+    const fontData = font.data as unknown as { resolution: number, boundingBox: { yMax: number } };
+    const topToBaseline = fontData.boundingBox.yMax * size / fontData.resolution;
+    const lineHeight = measureLineHeight(size, font) * DESC_LINE_HEIGHT_FACTOR;
+    const material = new MeshBasicMaterial({ color });
+
+    for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+      const lineWords = lines[lineIdx];
+      const isLastLine = lineIdx === lines.length - 1;
+      const lineText = lineWords.map(w => w.text).join(' ');
+
+      // Generate per-character shape data for the full line
+      const charInfos = generateCharShapes(lineText, font, size);
+
+      // Compute justified spacing
+      const naturalWidth = measureTextWidth(lineText, size, font);
+      const spaceCount = charInfos.filter(c => c.char === ' ').length;
+      const extraPerSpace = (!isLastLine && spaceCount > 0)
+        ? (maxWidth - naturalWidth) / spaceCount
+        : 0;
+
+      // Lay out character meshes with justified spacing
+      let cursorX = 0;
+      let spacesSoFar = 0;
+      let linkStartX = 0;
+      let currentLinkRun: InlineRun | null = null;
+      // Track which word we're in for link detection
+      let wordIdx = 0;
+
+      for (const info of charInfos) {
+        const x = left + cursorX + spacesSoFar * extraPerSpace;
+        const charY = y - topToBaseline;
+        const isBold = info.char !== ' ' && lineWords[wordIdx]?.bold;
+
+        if (isBold && info.shapes.length > 0) {
+          const container = new Object3D();
+          container.position.set(x, charY, 0);
+          const mats: MeshBasicMaterial[] = [];
+          for (const shape of info.shapes) {
+            const mat = new MeshBasicMaterial();
+            mats.push(mat);
+            const mesh = new Mesh(new ShapeGeometry(shape), mat);
+            mesh.layers.set(BLOOM_LAYER);
+            container.add(mesh);
+          }
+          this.add(container);
+          this.animatedChars.push({
+            container,
+            materials: mats,
+            baseY: charY,
+            index: this.animatedChars.length,
+          });
+        } else {
+          for (const shape of info.shapes) {
+            const mesh = new Mesh(new ShapeGeometry(shape), material);
+            mesh.layers.set(BLOOM_LAYER);
+            mesh.position.set(x, charY, 0);
+            this.add(mesh);
+          }
+        }
+
+        // Track link spans using word mapping
+        if (info.char === ' ') {
+          // Space between words — advance word index
+          if (currentLinkRun?.type === 'link') {
+            // Check if next word is still the same link
+            const nextWord = lineWords[wordIdx + 1];
+            if (!nextWord || nextWord.run !== currentLinkRun) {
+              this.addLinkHitArea(linkStartX, x, y, size, currentLinkRun.url);
+              currentLinkRun = null;
+            }
+          }
+          wordIdx++;
+          spacesSoFar++;
+        } else {
+          const word = lineWords[wordIdx];
+          if (word?.run.type === 'link' && currentLinkRun !== word.run) {
+            if (currentLinkRun?.type === 'link') {
+              this.addLinkHitArea(linkStartX, x, y, size, currentLinkRun.url);
+            }
+            linkStartX = x;
+            currentLinkRun = word.run;
+          } else if (word?.run.type !== 'link' && currentLinkRun?.type === 'link') {
+            this.addLinkHitArea(linkStartX, x, y, size, currentLinkRun.url);
+            currentLinkRun = null;
+          }
+        }
+
+        cursorX += info.advanceWidth;
+      }
+
+      // Close trailing link span
+      if (currentLinkRun?.type === 'link') {
+        const endX = left + cursorX + spacesSoFar * extraPerSpace;
+        this.addLinkHitArea(linkStartX, endX, y, size, currentLinkRun.url);
+      }
+
+      y -= lineHeight;
+    }
+
+    // Remove trailing inter-line leading after the last line
+    y += lineHeight - measureLineHeight(size, font);
+
+    return y;
+  }
+
+  private addLinkHitArea(
+    startX: number,
+    endX: number,
+    y: number,
+    size: number,
+    url: string,
+  ): void {
+    const width = endX - startX;
+    const hitArea = new Mesh(
+      new PlaneGeometry(width, size * 1.2),
+      new MeshBasicMaterial({ visible: false }),
+    );
+    hitArea.position.set(startX + width / 2, y - size / 2, 0);
+    this.add(hitArea);
+    this.clickTargets.push({ mesh: hitArea, url });
+  }
+
+  private renderImage(
+    src: string,
+    left: number,
+    startY: number,
+    maxWidth: number,
+  ): number {
+    const aspect = this.imageDims.get(src) ?? IMAGE_ASPECT;
+    const imageWidth = maxWidth;
+    const imageHeight = imageWidth / aspect;
+    const centerX = left + maxWidth / 2;
+
+    const geo = new PlaneGeometry(imageWidth, imageHeight);
+    const mat = new MeshBasicMaterial({ transparent: true, opacity: 0 });
+    const plane = new Mesh(geo, mat);
+    plane.position.set(centerX, startY - imageHeight / 2, 0);
+    this.add(plane);
+
+    // Black fill on bloom layer to occlude stars behind the image
+    const bloomFill = new Mesh(geo, new MeshBasicMaterial({ color: NeonColor.Black }));
+    bloomFill.layers.set(BLOOM_LAYER);
+    bloomFill.renderOrder = -1;
+    bloomFill.position.copy(plane.position);
+    this.add(bloomFill);
+
+    this.textureLoader.load(src, (texture) => {
+      texture.colorSpace = SRGBColorSpace;
+      mat.map = texture;
+      mat.opacity = 1;
+      mat.needsUpdate = true;
+    });
+
+    return startY - imageHeight;
   }
 }

@@ -2,6 +2,7 @@ import { EffectComposer, EffectPass, RenderPass } from 'postprocessing';
 import { Camera, Clock, Mesh, Object3D, OrthographicCamera, PerspectiveCamera, Raycaster, Vector2, WebGLRenderer } from 'three';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial';
 import { Font, FontLoader } from 'three/examples/jsm/loaders/FontLoader';
+import { TTFLoader } from 'three/examples/jsm/loaders/TTFLoader';
 
 import { BLOOM_LAYER } from '@/core/layers';
 import Router, { NavigationDirection, Route } from '@/core/router';
@@ -42,6 +43,7 @@ export default class App {
   static get lineWidth(): number { return Math.min(this.width, this.height) / 325; }
 
   static get synthaFont(): Font { return App.#instance.synthaFont; }
+  static get bookerlyFont(): Font { return App.#instance.bookerlyFont; }
 
   static init(): void {
     new App(); // eslint-disable-line no-new
@@ -102,6 +104,7 @@ export default class App {
   router: Router;
 
   synthaFont: Font;
+  bookerlyFont: Font;
 
   constructor() {
     assert(App.#instance === undefined, 'An App instance already exists');
@@ -142,12 +145,22 @@ export default class App {
   }
 
   load(): void {
+    let remaining = 2;
+    const onLoaded = (): void => {
+      if (--remaining > 0) return;
+      this.scene.init();
+      window.addEventListener('wheel', this.onWheel.bind(this), { passive: true });
+      this.draw();
+    };
+
     new FontLoader().load('/assets/fonts/syntha/Syntha.json', font => {
       this.synthaFont = font;
+      onLoaded();
+    });
 
-      // TODO: Init scene after all assets are loaded
-      this.scene.init();
-      this.draw();
+    new TTFLoader().load('/assets/fonts/bookerly/Bookerly.ttf', json => {
+      this.bookerlyFont = new Font(json);
+      onLoaded();
     });
   }
 
@@ -193,6 +206,10 @@ export default class App {
 
   onPointerLeave(): void {
     this.pointerActive = false;
+  }
+
+  onWheel(event: WheelEvent): void {
+    this.scene.viewManager.onWheel(event.deltaY);
   }
 
   updateCameraBounds(): void {
