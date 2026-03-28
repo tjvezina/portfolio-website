@@ -64,3 +64,18 @@ export function getProjectData(area: ProjectArea, slug: string): ProjectData | u
 export function getAllCategories(): CategoryData[] {
   return [...categories.values()];
 }
+
+export function getProjectIndex(area: ProjectArea, slug: string): number {
+  return getCategoryData(area).projects.findIndex(p => p.slug === slug);
+}
+
+export function getAdjacentProject(
+  area: ProjectArea, slug: string, offset: number,
+): ProjectData | undefined {
+  const projects = getCategoryData(area).projects;
+  const index = projects.findIndex(p => p.slug === slug);
+  if (index === -1) return undefined;
+  const newIndex = index + offset;
+  if (newIndex < 0 || newIndex >= projects.length) return undefined;
+  return projects[newIndex];
+}
