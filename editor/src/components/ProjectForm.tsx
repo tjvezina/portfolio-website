@@ -30,7 +30,7 @@ function TagsInput({
   tags: string[];
   allTags: string[];
   onChange: (tags: string[]) => void;
-  onCommit: () => void;
+  onCommit: (tags: string[]) => void;
 }): React.ReactElement {
   const [input, setInput] = useState('');
   const [highlightIndex, setHighlightIndex] = useState(-1);
@@ -101,7 +101,17 @@ function TagsInput({
             placeholder={tags.length === 0 ? 'Add tags…' : ''}
             onChange={(e) => { setInput(e.target.value); setHighlightIndex(-1); }}
             onKeyDown={handleKeyDown}
-            onBlur={() => { addTag(input); onCommit(); }}
+            onBlur={() => {
+              const trimmed = input.trim();
+              let result = tags;
+              if (trimmed && !tags.includes(trimmed)) {
+                result = [...tags, trimmed];
+                onChange(result);
+              }
+              setInput('');
+              setHighlightIndex(-1);
+              onCommit(result);
+            }}
           />
           {suggestions.length > 0 && (
             <ul className="tag-suggestions">
@@ -132,6 +142,7 @@ export default function ProjectForm({
 }: ProjectFormProps): React.ReactElement {
   const [form, setForm] = useState<ProjectData>({ ...project });
   const [error, setError] = useState<string | null>(null);
+  const [yearInvalid, setYearInvalid] = useState(false);
   const formRef = useRef(form);
   formRef.current = form;
 
@@ -139,6 +150,16 @@ export default function ProjectForm({
     setForm({ ...project });
     setError(null);
   }, [project, category]);
+
+  function isValidYear(value: string): boolean {
+    if (value.trim() === '') return true;
+    return value.split(',').every((part) => {
+      const trimmed = part.trim();
+      if (/^\d{4}$/.test(trimmed)) return true;
+      const match = trimmed.match(/^(\d{4})-(\d{4})$/);
+      return match !== null && Number(match[1]) < Number(match[2]);
+    });
+  }
 
   function updateField<K extends keyof ProjectData>(key: K, value: ProjectData[K]): void {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -150,7 +171,7 @@ export default function ProjectForm({
     if (data.year) cleaned.year = data.year;
     const tags = data.tags?.filter(Boolean);
     if (tags && tags.length > 0) cleaned.tags = tags;
-    if (data.playUrl) cleaned.playUrl = data.playUrl;
+    if (data.playUrls && data.playUrls.length > 0) cleaned.playUrls = data.playUrls;
     if (data.thumbnail) cleaned.thumbnail = data.thumbnail;
     return cleaned;
   }
@@ -229,37 +250,86 @@ export default function ProjectForm({
       <div className="year-tags-row">
         <label className="year-label">
           Year
-          <select
+          <input
+            type="text"
+            className={yearInvalid ? 'input-error' : undefined}
             value={form.year ?? ''}
-            onChange={(e) => {
-              updateField('year', e.target.value ? Number(e.target.value) : undefined);
-              autoSave();
+            placeholder="e.g. 2010-2012"
+            onChange={(e) => { updateField('year', e.target.value); setYearInvalid(false); }}
+            onBlur={() => {
+              if (isValidYear(form.year ?? '')) {
+                setYearInvalid(false);
+                autoSave();
+              } else {
+                setYearInvalid(true);
+              }
             }}
-          >
-            <option value="">—</option>
-            {Array.from({ length: new Date().getFullYear() - 2009 }, (_, i) => 2010 + i).map((y) => (
-              <option key={y} value={y}>{y}</option>
-            ))}
-          </select>
+          />
         </label>
 
         <TagsInput
           tags={form.tags ?? []}
           allTags={allTags}
           onChange={(tags) => updateField('tags', tags)}
-          onCommit={autoSave}
+          onCommit={(tags) => {
+            const filtered = tags.filter(Boolean);
+            saveFieldNow('tags', filtered.length > 0 ? filtered : undefined);
+          }}
         />
       </div>
 
-      <label>
-        Play URL
-        <input
-          type="url"
-          value={form.playUrl ?? ''}
-          onChange={(e) => updateField('playUrl', e.target.value)}
-          onBlur={autoSave}
-        />
-      </label>
+      <div className="play-urls-field">
+        <div className="play-urls-header">
+          <span className="play-urls-label">Play URLs</span>
+          <button
+            type="button"
+            className="play-urls-add"
+            onClick={() => {
+              updateField('playUrls', [...(form.playUrls ?? []), { name: '', url: '' }]);
+            }}
+          >
+            +
+          </button>
+        </div>
+        {(form.playUrls ?? []).map((entry, i) => (
+          <div key={i} className="play-url-row">
+            <input
+              type="text"
+              className="play-url-name"
+              placeholder="Name"
+              value={entry.name}
+              onChange={(e) => {
+                const urls = [...(form.playUrls ?? [])];
+                urls[i] = { ...urls[i], name: e.target.value };
+                updateField('playUrls', urls);
+              }}
+              onBlur={autoSave}
+            />
+            <input
+              type="url"
+              className="play-url-value"
+              placeholder="https://…"
+              value={entry.url}
+              onChange={(e) => {
+                const urls = [...(form.playUrls ?? [])];
+                urls[i] = { ...urls[i], url: e.target.value };
+                updateField('playUrls', urls);
+              }}
+              onBlur={autoSave}
+            />
+            <button
+              type="button"
+              className="play-url-remove"
+              onClick={() => {
+                const urls = (form.playUrls ?? []).filter((_, j) => j !== i);
+                saveFieldNow('playUrls', urls.length > 0 ? urls : undefined);
+              }}
+            >
+              &times;
+            </button>
+          </div>
+        ))}
+      </div>
 
       <DescriptionEditor
         category={category}

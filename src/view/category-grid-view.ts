@@ -718,7 +718,7 @@ export default class CategoryGridView extends Object3D {
         }
       });
 
-      // Hover overlay: dim layer + word-wrapped title + year
+      // Hover overlay: dim layer + word-wrapped title
       const overlay = new Object3D();
       overlay.position.z = PRISM_DEPTH / 2 + 0.02;
       overlay.visible = false;
@@ -730,10 +730,7 @@ export default class CategoryGridView extends Object3D {
       const { lines: titleLines, size: titleSize } = fitText(project.title, cs * 0.09, maxWidth);
       const lineHeight = titleSize * 1.4;
       const titleBlockHeight = lineHeight * titleLines.length;
-      const yearSize = cs * 0.07;
-      const gap = cs * 0.06;
-      const totalHeight = titleBlockHeight + (project.year ? gap + yearSize : 0);
-      const topY = totalHeight / 2;
+      const topY = titleBlockHeight / 2;
 
       for (let i = 0; i < titleLines.length; i++) {
         const lineText = new Text(titleLines[i], App.synthaFont, {
@@ -743,16 +740,6 @@ export default class CategoryGridView extends Object3D {
         lineText.position.y = topY - lineHeight / 2 - i * lineHeight;
         lineText.position.z = 0.01;
         overlay.add(lineText);
-      }
-
-      if (project.year) {
-        const yearText = new Text(String(project.year), App.synthaFont, {
-          color: this.color,
-          size: yearSize,
-        });
-        yearText.position.y = -topY + yearSize / 2;
-        yearText.position.z = 0.01;
-        overlay.add(yearText);
       }
 
       // Collect all materials in the overlay for fade animation

@@ -32,6 +32,14 @@
   border-color: #c0965a;
 }
 
+.project-form input.input-error {
+  border-color: #aa3333;
+}
+
+.project-form input.input-error:focus {
+  border-color: #cc4444;
+}
+
 .project-form textarea {
   resize: vertical;
 }
@@ -67,22 +75,8 @@
   margin-bottom: 0 !important;
 }
 
-.year-label select {
-  display: block;
-  margin-top: 4px;
-  padding: 7px 10px;
-  background: #121214;
-  border: 1px solid #2a2a2e;
-  border-radius: 4px;
-  color: #c8c8cc;
-  font-size: 0.9rem;
-  font-family: inherit;
-  width: 5.5em;
-}
-
-.year-label select:focus {
-  outline: none;
-  border-color: #c0965a;
+.year-label input[type="text"] {
+  width: 10em;
 }
 
 .year-tags-row .tags-field {
@@ -226,4 +220,83 @@
 .tag-suggestion.highlighted {
   background: #2a2a2e;
   color: #d4a86a;
+}
+
+/* Play URLs */
+.play-urls-field {
+  margin-bottom: 16px;
+}
+
+.play-urls-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.play-urls-label {
+  font-size: 0.85rem;
+  color: #888;
+}
+
+.play-urls-add {
+  background: none;
+  border: 1px solid #2a2a2e;
+  border-radius: 4px;
+  color: #888;
+  font-size: 1rem;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.play-urls-add:hover {
+  border-color: #c0965a;
+  color: #d4a86a;
+}
+
+.play-url-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.play-url-row:last-child {
+  margin-bottom: 0;
+}
+
+.project-form input[type="text"].play-url-name {
+  width: 180px;
+  flex-shrink: 0;
+}
+
+.project-form input[type="url"].play-url-value {
+  flex: 1;
+  min-width: 0;
+}
+
+.play-url-remove {
+  background: none;
+  border: 1px solid #2a2a2e;
+  border-radius: 4px;
+  color: #888;
+  font-size: 1rem;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.play-url-remove:hover {
+  border-color: #aa3333;
+  color: #cc4444;
 }

@@ -51,7 +51,7 @@ export default class ProjectPageView extends Object3D {
 
     // Year
     if (project.year) {
-      const yearText = new Text(String(project.year), App.synthaFont, {
+      const yearText = new Text(project.year, App.synthaFont, {
         color: NeonColor.White,
         size: 0.1 * App.pixelRatio,
         alignX: TextAlignX.Left,
@@ -62,12 +62,14 @@ export default class ProjectPageView extends Object3D {
     }
 
     // Action buttons
-    if (project.playUrl) {
-      const playBtn = this.createButton('PLAY', color);
-      playBtn.position.set(-3, yOffset, 0);
-      playBtn.userData.url = project.playUrl;
-      this.add(playBtn);
-      yOffset -= 0.8;
+    if (project.playUrls) {
+      for (const link of project.playUrls) {
+        const btn = this.createButton(link.name.toUpperCase(), color);
+        btn.position.set(-3, yOffset, 0);
+        btn.userData.url = link.url;
+        this.add(btn);
+        yOffset -= 0.8;
+      }
     }
 
   }

@@ -5,9 +5,9 @@ export interface ProjectData {
   title: string;
   thumbnail?: string;
   description?: string;
-  playUrl?: string;
+  playUrls?: { name: string; url: string }[];
   tags?: string[];
-  year?: number;
+  year?: string;
 }
 
 export interface CategoryData {
