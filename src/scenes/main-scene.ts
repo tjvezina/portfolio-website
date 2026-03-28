@@ -1,11 +1,13 @@
 import { BloomEffect, EffectPass } from 'postprocessing';
-import { AdditiveBlending, Mesh, MeshBasicMaterial, Scene } from 'three';
+import { AdditiveBlending, CanvasTexture, Mesh, MeshBasicMaterial, PlaneGeometry, Scene } from 'three';
 
 import App from '@/core/app';
+import { BLOOM_LAYER } from '@/core/layers';
 import { NeonColor } from '@/core/neon-color';
 import ViewManager, { setInputEnabled } from '@/core/view-manager';
 import Text, { TextAlignX, TextAlignY } from '@/objects/text';
 import { updateBehaviours } from '@/utils/scene-utils';
+import { measureLineHeight, measureTextWidth } from '@/utils/text-utils';
 import IntroAnimation from '@/view/intro-animation';
 import StarField from '@/view/star-field';
 
@@ -59,6 +61,9 @@ export default class MainScene extends Scene {
     // Title text renders on top of everything (never occluded by grids, etc.)
     makeOverlay(this.titleText);
 
+    // Soft gradient background behind title for readability
+    this.createTitleBackground();
+
     this.starField = new StarField(App.camera);
     this.starField.position.z = -15;
     App.cameraRig.add(this.starField);
@@ -98,6 +103,87 @@ export default class MainScene extends Scene {
     this.titleText.position.x = -5*Math.max(1, App.width/App.height) + 0.3;
     this.titleText.position.y = 5*Math.max(1, App.height/App.width) - 0.3;
     this.viewManager.onWindowResized();
+  }
+
+  private createTitleBackground(): void {
+    // Title text must be in the transparent queue so renderOrder is respected
+    // vs the gradient fills (Three.js renders all opaques before all transparents)
+    this.titleText.traverse(child => {
+      if (child instanceof Mesh && child.material instanceof MeshBasicMaterial) {
+        child.material.transparent = true;
+      }
+    });
+
+    const titleStr = 'TYLER J VEZINA';
+    const fontSize = 0.16 * App.pixelRatio;
+    const textW = measureTextWidth(titleStr, fontSize);
+    const textH = measureLineHeight(fontSize);
+
+    // Plane extends beyond the text by this much on each side for the gradient fade
+    const pad = textH * 2;
+    const planeW = textW + pad * 2;
+    const planeH = textH + pad * 2;
+
+    // Generate gradient texture: solid black center, smoothstep fade at edges
+    const canvas = document.createElement('canvas');
+    const cw = 128, ch = 64;
+    canvas.width = cw;
+    canvas.height = ch;
+    const ctx = canvas.getContext('2d')!;
+    const img = ctx.createImageData(cw, ch);
+    const px = img.data;
+    const fadeX = pad / planeW;
+    const fadeY = pad / planeH;
+
+    for (let y = 0; y < ch; y++) {
+      for (let x = 0; x < cw; x++) {
+        const nx = x / (cw - 1);
+        const ny = y / (ch - 1);
+
+        let ax = 1;
+        if (nx < fadeX) ax = nx / fadeX;
+        else if (nx > 1 - fadeX) ax = (1 - nx) / fadeX;
+
+        let ay = 1;
+        if (ny < fadeY) ay = ny / fadeY;
+        else if (ny > 1 - fadeY) ay = (1 - ny) / fadeY;
+
+        // Smoothstep for soft falloff
+        ax = ax * ax * (3 - 2 * ax);
+        ay = ay * ay * (3 - 2 * ay);
+
+        const i = (y * cw + x) * 4;
+        px[i] = 0;
+        px[i + 1] = 0;
+        px[i + 2] = 0;
+        px[i + 3] = Math.round(ax * ay * 255);
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    const texture = new CanvasTexture(canvas);
+
+    const geo = new PlaneGeometry(planeW, planeH);
+
+    // Layer 0 fill (occludes clean-pass objects like thumbnails)
+    const fill = new Mesh(geo, new MeshBasicMaterial({
+      map: texture, transparent: true, depthTest: false,
+    }));
+    fill.renderOrder = 998;
+
+    // Bloom layer fill (occludes bloom-pass wireframes; black adds nothing in additive)
+    const bloomFill = new Mesh(geo, new MeshBasicMaterial({
+      map: texture, transparent: true, depthTest: false,
+    }));
+    bloomFill.layers.set(BLOOM_LAYER);
+    bloomFill.renderOrder = 998;
+
+    // Title is left-top aligned → text extends right (+x) and down (-y)
+    const cx = textW / 2;
+    const cy = -textH / 2;
+    fill.position.set(cx, cy, -0.01);
+    bloomFill.position.set(cx, cy, -0.01);
+
+    this.titleText.add(fill, bloomFill);
   }
 
   update(): void {
