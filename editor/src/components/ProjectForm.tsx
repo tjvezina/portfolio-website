@@ -1,13 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 
 import type { ProjectData } from '../api';
 import { deleteProject, updateProject } from '../api';
+import DescriptionEditor from './DescriptionEditor';
 import ImagePicker from './ImagePicker';
 import './ProjectForm.css';
 
 interface ProjectFormProps {
   category: string;
   project: ProjectData;
+  allTags: string[];
   onSaved: (slug: string) => void;
   onDeleted: () => void;
 }
@@ -19,16 +21,117 @@ function slugify(text: string): string {
     .replace(/^-|-$/g, '');
 }
 
+function TagsInput({
+  tags,
+  allTags,
+  onChange,
+  onCommit,
+}: {
+  tags: string[];
+  allTags: string[];
+  onChange: (tags: string[]) => void;
+  onCommit: () => void;
+}): React.ReactElement {
+  const [input, setInput] = useState('');
+  const [highlightIndex, setHighlightIndex] = useState(-1);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Filter suggestions: match input, exclude already-added tags
+  const suggestions = input.trim()
+    ? allTags.filter((t) => !tags.includes(t) && t.toLowerCase().includes(input.trim().toLowerCase()))
+    : [];
+
+  function addTag(value: string): void {
+    const trimmed = value.trim();
+    if (trimmed && !tags.includes(trimmed)) {
+      onChange([...tags, trimmed]);
+    }
+    setInput('');
+    setHighlightIndex(-1);
+  }
+
+  function handleKeyDown(e: KeyboardEvent<HTMLInputElement>): void {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setHighlightIndex((i) => Math.min(i + 1, suggestions.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlightIndex((i) => Math.max(i - 1, 0));
+    } else if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      if (highlightIndex >= 0 && highlightIndex < suggestions.length) {
+        addTag(suggestions[highlightIndex]);
+      } else {
+        addTag(input);
+      }
+    } else if (e.key === 'Backspace' && input === '' && tags.length > 0) {
+      onChange(tags.slice(0, -1));
+    } else if (e.key === 'Escape') {
+      setInput('');
+      setHighlightIndex(-1);
+    }
+  }
+
+  function removeTag(index: number): void {
+    onChange(tags.filter((_, i) => i !== index));
+  }
+
+  return (
+    <div className="tags-field">
+      <span className="tags-label">Tags</span>
+      <div className="tags-input-box" onClick={() => inputRef.current?.focus()}>
+        {tags.map((tag, i) => (
+          <span key={`${tag}-${i}`} className="tag-chip">
+            {tag}
+            <button
+              type="button"
+              className="tag-remove"
+              onClick={(e) => { e.stopPropagation(); removeTag(i); }}
+            >
+              &times;
+            </button>
+          </span>
+        ))}
+        <div className="tag-input-wrapper">
+          <input
+            ref={inputRef}
+            className="tag-text-input"
+            type="text"
+            value={input}
+            placeholder={tags.length === 0 ? 'Add tags…' : ''}
+            onChange={(e) => { setInput(e.target.value); setHighlightIndex(-1); }}
+            onKeyDown={handleKeyDown}
+            onBlur={() => { addTag(input); onCommit(); }}
+          />
+          {suggestions.length > 0 && (
+            <ul className="tag-suggestions">
+              {suggestions.map((s, i) => (
+                <li
+                  key={s}
+                  className={'tag-suggestion' + (i === highlightIndex ? ' highlighted' : '')}
+                  onMouseDown={(e) => { e.preventDefault(); addTag(s); }}
+                  onMouseEnter={() => setHighlightIndex(i)}
+                >
+                  {s}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ProjectForm({
   category,
   project,
+  allTags,
   onSaved,
   onDeleted,
 }: ProjectFormProps): React.ReactElement {
   const [form, setForm] = useState<ProjectData>({ ...project });
   const [error, setError] = useState<string | null>(null);
-  const [ssDragIndex, setSsDragIndex] = useState<number | null>(null);
-  const [ssDropIndex, setSsDropIndex] = useState<number | null>(null);
   const formRef = useRef(form);
   formRef.current = form;
 
@@ -45,11 +148,10 @@ export default function ProjectForm({
     const cleaned: ProjectData = { slug: data.slug, title: data.title };
     if (data.description) cleaned.description = data.description;
     if (data.year) cleaned.year = data.year;
-    if (data.tags && data.tags.length > 0) cleaned.tags = data.tags;
+    const tags = data.tags?.filter(Boolean);
+    if (tags && tags.length > 0) cleaned.tags = tags;
     if (data.playUrl) cleaned.playUrl = data.playUrl;
-    if (data.sourceUrl) cleaned.sourceUrl = data.sourceUrl;
     if (data.thumbnail) cleaned.thumbnail = data.thumbnail;
-    if (data.screenshots && data.screenshots.length > 0) cleaned.screenshots = data.screenshots;
     return cleaned;
   }
 
@@ -89,92 +191,65 @@ export default function ProjectForm({
     }
   }
 
-  function handleSsDragStart(e: React.DragEvent, index: number): void {
-    setSsDragIndex(index);
-    e.dataTransfer.effectAllowed = 'move';
-  }
-
-  function handleSsDragOver(e: React.DragEvent, index: number): void {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    setSsDropIndex(index);
-  }
-
-  function handleSsDragEnd(): void {
-    if (ssDragIndex !== null && ssDropIndex !== null && ssDragIndex !== ssDropIndex) {
-      const screenshots = [...(form.screenshots ?? [])];
-      const [moved] = screenshots.splice(ssDragIndex, 1);
-      screenshots.splice(ssDropIndex, 0, moved);
-      saveFieldNow('screenshots', screenshots);
-    }
-    setSsDragIndex(null);
-    setSsDropIndex(null);
-  }
-
   return (
     <div className="project-form">
-      <h2>Edit: {project.title}</h2>
 
       {error && <div className="form-error">{error}</div>}
 
-      <label>
-        Title
-        <input
-          type="text"
-          value={form.title}
-          onChange={(e) => updateField('title', e.target.value)}
-          onBlur={autoSave}
+      <div className="form-header">
+        <ImagePicker
+          category={category}
+          slug={form.slug}
+          currentPath={form.thumbnail}
+          onImported={(path) => saveFieldNow('thumbnail', path)}
         />
-      </label>
+        <div className="form-header-fields">
+          <label>
+            Title
+            <input
+              type="text"
+              value={form.title}
+              onChange={(e) => updateField('title', e.target.value)}
+              onBlur={autoSave}
+            />
+          </label>
+          <label>
+            Slug
+            <input
+              type="text"
+              value={form.slug}
+              pattern="[a-z0-9-]+"
+              onChange={(e) => updateField('slug', slugify(e.target.value))}
+              onBlur={autoSave}
+            />
+          </label>
+        </div>
+      </div>
 
-      <label>
-        Slug
-        <input
-          type="text"
-          value={form.slug}
-          pattern="[a-z0-9-]+"
-          onChange={(e) => updateField('slug', slugify(e.target.value))}
-          onBlur={autoSave}
-        />
-      </label>
+      <div className="year-tags-row">
+        <label className="year-label">
+          Year
+          <select
+            value={form.year ?? ''}
+            onChange={(e) => {
+              updateField('year', e.target.value ? Number(e.target.value) : undefined);
+              autoSave();
+            }}
+          >
+            <option value="">—</option>
+            {Array.from({ length: new Date().getFullYear() - 2009 }, (_, i) => 2010 + i).map((y) => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
+        </label>
 
-      <label>
-        Description
-        <textarea
-          value={form.description ?? ''}
-          rows={4}
-          onChange={(e) => updateField('description', e.target.value)}
-          onBlur={autoSave}
+        <TagsInput
+          tags={form.tags ?? []}
+          allTags={allTags}
+          onChange={(tags) => updateField('tags', tags)}
+          onCommit={autoSave}
         />
-      </label>
-
-      <label>
-        Year
-        <input
-          type="number"
-          value={form.year ?? ''}
-          onChange={(e) => updateField('year', e.target.value ? Number(e.target.value) : undefined)}
-          onBlur={autoSave}
-        />
-      </label>
-
-      <label>
-        Tags (comma-separated)
-        <input
-          type="text"
-          value={(form.tags ?? []).join(', ')}
-          onChange={(e) =>
-            updateField(
-              'tags',
-              e.target.value
-                .split(',')
-                .map((t) => t.trim())
-                .filter(Boolean),
-            )
-          }
-          onBlur={autoSave}
-        />
-      </label>
+      </div>
 
       <label>
         Play URL
@@ -186,70 +261,13 @@ export default function ProjectForm({
         />
       </label>
 
-      <label>
-        Source URL
-        <input
-          type="url"
-          value={form.sourceUrl ?? ''}
-          onChange={(e) => updateField('sourceUrl', e.target.value)}
-          onBlur={autoSave}
-        />
-      </label>
-
-      <ImagePicker
-        label="Thumbnail"
+      <DescriptionEditor
         category={category}
         slug={form.slug}
-        type="thumbnail"
-        currentPath={form.thumbnail}
-        onImported={(path) => saveFieldNow('thumbnail', path)}
-        onRemove={() => saveFieldNow('thumbnail', '')}
+        value={form.description ?? ''}
+        onChange={(md) => updateField('description', md)}
+        onBlur={autoSave}
       />
-
-      <div className="image-picker">
-        <span className="image-picker-label">Screenshots</span>
-        <div className="screenshots-list">
-          {(form.screenshots ?? []).map((path, i) => (
-            <div
-              key={path}
-              className={
-                'image-preview-container'
-                + (ssDragIndex === i ? ' dragging' : '')
-                + (ssDropIndex === i && ssDragIndex !== i ? ' drop-target' : '')
-              }
-              draggable
-              onDragStart={(e) => handleSsDragStart(e, i)}
-              onDragOver={(e) => handleSsDragOver(e, i)}
-              onDragEnd={handleSsDragEnd}
-            >
-              <img className="image-preview" src={`/${path}`} alt={`Screenshot ${i + 1}`} />
-              <button
-                className="image-remove-btn"
-                onClick={() =>
-                  saveFieldNow(
-                    'screenshots',
-                    (form.screenshots ?? []).filter((_, j) => j !== i),
-                  )
-                }
-                title="Remove"
-              >
-                &times;
-              </button>
-            </div>
-          ))}
-        </div>
-        <ImagePicker
-          label=""
-          category={category}
-          slug={form.slug}
-          type="screenshot"
-          multiple
-          onImported={() => {}}
-          onMultipleImported={(paths) =>
-            saveFieldNow('screenshots', [...(form.screenshots ?? []), ...paths])
-          }
-        />
-      </div>
 
       <div className="form-actions">
         <button className="delete-btn" onClick={handleDelete}>

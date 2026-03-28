@@ -1,82 +1,21 @@
 .image-picker {
-  margin-bottom: 16px;
-}
-
-.image-picker-label {
-  display: block;
-  font-size: 0.85rem;
-  color: #888;
-  margin-bottom: 6px;
-}
-
-.image-preview-container {
-  position: relative;
-  display: inline-block;
-  margin-bottom: 8px;
-  cursor: grab;
-}
-
-.image-preview-container:active {
-  cursor: grabbing;
-}
-
-.image-preview-container.dragging {
-  opacity: 0.4;
-}
-
-.image-preview-container.drop-target {
-  border-left: 2px solid #d4a86a;
+  flex-shrink: 0;
 }
 
 .image-preview {
-  max-width: 200px;
-  max-height: 150px;
+  width: 128px;
+  height: 128px;
+  box-sizing: content-box;
+  object-fit: cover;
   border-radius: 4px;
   border: 1px solid #2a2a2e;
-}
-
-.image-remove-btn {
-  position: absolute;
-  top: -6px;
-  right: -6px;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: #aa3333;
-  border: none;
-  color: #fff;
-  font-size: 14px;
-  line-height: 1;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.image-choose-btn {
   display: block;
-  padding: 6px 14px;
-  background: #2a2a2e;
-  border: 1px solid #333338;
-  border-radius: 4px;
-  color: #999;
-  font-size: 0.85rem;
+}
+
+.image-preview.clickable {
   cursor: pointer;
 }
 
-.image-choose-btn:hover {
-  background: #333338;
-  color: #c8c8cc;
-}
-
-.image-choose-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.screenshots-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-bottom: 8px;
+.image-preview.clickable:hover {
+  border-color: #c0965a;
 }

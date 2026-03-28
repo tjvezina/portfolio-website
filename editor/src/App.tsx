@@ -13,9 +13,13 @@ interface Selection {
 
 export default function App(): React.ReactElement {
   const [categories, setCategories] = useState<CategoryData[]>([]);
-  const [selection, setSelection] = useState<Selection>({
-    category: 'personal',
-    slug: null,
+  const [selection, setSelection] = useState<Selection>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('editor-selection') ?? '{}');
+      return { category: saved.category ?? 'personal', slug: saved.slug ?? null };
+    } catch {
+      return { category: 'personal', slug: null };
+    }
   });
   const [showNewDialog, setShowNewDialog] = useState(false);
 
@@ -27,6 +31,10 @@ export default function App(): React.ReactElement {
   useEffect(() => {
     loadCategories();
   }, [loadCategories]);
+
+  useEffect(() => {
+    localStorage.setItem('editor-selection', JSON.stringify(selection));
+  }, [selection]);
 
   const selectedProject: ProjectData | undefined = categories
     .find((c) => c.area === selection.category)
@@ -59,6 +67,7 @@ export default function App(): React.ReactElement {
             <ProjectForm
               category={selection.category}
               project={selectedProject}
+              allTags={[...new Set(categories.flatMap((c) => c.projects.flatMap((p) => p.tags ?? [])))].sort()}
               onSaved={async (savedSlug) => {
                 await loadCategories();
                 setSelection((prev) => ({ ...prev, slug: savedSlug }));

@@ -1,11 +1,6 @@
 .project-form {
-  max-width: 640px;
-}
-
-.project-form h2 {
-  font-size: 1.1rem;
-  color: #d4a86a;
-  margin-bottom: 20px;
+  max-width: 768px;
+  margin: 0 auto;
 }
 
 .project-form label {
@@ -41,19 +36,7 @@
   resize: vertical;
 }
 
-.form-error {
-  background: #2a1a1a;
-  border: 1px solid #aa3333;
-  color: #dd6666;
-  padding: 8px 12px;
-  border-radius: 4px;
-  margin-bottom: 16px;
-  font-size: 0.85rem;
-}
-
 .form-actions {
-  display: flex;
-  gap: 12px;
   margin-top: 24px;
 }
 
@@ -71,3 +54,176 @@
   background: #2a1a1a;
 }
 
+/* Year + Tags row */
+.year-tags-row {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.year-label {
+  flex-shrink: 0;
+  margin-bottom: 0 !important;
+}
+
+.year-label select {
+  display: block;
+  margin-top: 4px;
+  padding: 7px 10px;
+  background: #121214;
+  border: 1px solid #2a2a2e;
+  border-radius: 4px;
+  color: #c8c8cc;
+  font-size: 0.9rem;
+  font-family: inherit;
+  width: 5.5em;
+}
+
+.year-label select:focus {
+  outline: none;
+  border-color: #c0965a;
+}
+
+.year-tags-row .tags-field {
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+/* Header row: thumbnail + title/slug */
+.form-header {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.form-header .image-picker {
+  margin-bottom: 0;
+  flex-shrink: 0;
+}
+
+.form-header-fields {
+  flex: 1;
+  min-width: 0;
+}
+
+.form-header-fields label {
+  margin-bottom: 10px;
+}
+
+.form-header-fields label:last-child {
+  margin-bottom: 0;
+}
+
+.form-error {
+  background: #2a1a1a;
+  border: 1px solid #aa3333;
+  color: #dd6666;
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin-bottom: 16px;
+  font-size: 0.85rem;
+}
+
+/* Tags chip input */
+.tags-field {
+  margin-bottom: 16px;
+}
+
+.tags-label {
+  display: block;
+  font-size: 0.85rem;
+  color: #888;
+  margin-bottom: 4px;
+}
+
+.tags-input-box {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: #121214;
+  border: 1px solid #2a2a2e;
+  border-radius: 4px;
+  cursor: text;
+}
+
+.tags-input-box:focus-within {
+  border-color: #c0965a;
+}
+
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border: 1px solid #c0965a;
+  border-radius: 3px;
+  color: #d4a86a;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.tag-remove {
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+}
+
+.tag-remove:hover {
+  color: #cc4444;
+}
+
+.tag-input-wrapper {
+  flex: 1;
+  min-width: 80px;
+  position: relative;
+}
+
+.project-form input[type="text"].tag-text-input {
+  width: 100%;
+  margin: 0;
+  padding: 2px 0;
+  background: none;
+  border: none;
+  border-radius: 0;
+  outline: none;
+  color: #c8c8cc;
+  font-size: 0.9rem;
+  font-family: inherit;
+}
+
+.tag-suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin: 4px 0 0;
+  padding: 4px 0;
+  list-style: none;
+  background: #1e1e22;
+  border: 1px solid #2a2a2e;
+  border-radius: 4px;
+  max-height: 160px;
+  overflow-y: auto;
+  z-index: 10;
+}
+
+.tag-suggestion {
+  padding: 4px 10px;
+  font-size: 0.85rem;
+  color: #c8c8cc;
+  cursor: pointer;
+}
+
+.tag-suggestion.highlighted {
+  background: #2a2a2e;
+  color: #d4a86a;
+}
