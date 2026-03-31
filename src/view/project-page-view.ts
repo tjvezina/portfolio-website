@@ -20,6 +20,7 @@ type InlineRun =
 type ContentBlock =
   | { type: 'paragraph', runs: InlineRun[] }
   | { type: 'image', src: string }
+  | { type: 'image-row', sources: string[] }
 
 type ClickTarget = {
   mesh: Mesh,
@@ -51,6 +52,7 @@ const DESC_LINE_HEIGHT_FACTOR = 1.5;
 const SECTION_GAP = 0.5;
 const PARAGRAPH_GAP = 0.35;
 const IMAGE_ASPECT = 16 / 9;
+const IMAGE_ROW_GAP = 0.05;
 export const THUMBNAIL_SCALE = 0.75;
 const BUTTON_PADDING_X = 0.2;
 const BUTTON_PADDING_Y = 0.12;
@@ -254,6 +256,9 @@ export default class ProjectPageView extends Object3D {
         } else if (block.type === 'image') {
           y = this.renderImage(block.src, descLeft, y, descWidth);
           y -= PARAGRAPH_GAP;
+        } else if (block.type === 'image-row') {
+          y = this.renderImageRow(block.sources, descLeft, y, descWidth);
+          y -= PARAGRAPH_GAP;
         }
       }
     }
@@ -385,7 +390,8 @@ export default class ProjectPageView extends Object3D {
   // ---------------------------------------------------------------------------
 
   private parseDescription(desc: string): ContentBlock[] {
-    const blocks: ContentBlock[] = [];
+    // Phase 1: Extract blocks; use 'sep' markers for blank lines between images
+    const rawBlocks: (ContentBlock | 'sep')[] = [];
     const imageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
     let lastIndex = 0;
     let match;
@@ -393,10 +399,12 @@ export default class ProjectPageView extends Object3D {
     while ((match = imageRegex.exec(desc)) !== null) {
       const textBefore = desc.slice(lastIndex, match.index);
       if (textBefore.trim()) {
-        blocks.push(...this.parseTextBlocks(textBefore));
+        rawBlocks.push(...this.parseTextBlocks(textBefore));
+      } else if (textBefore.includes('\n\n')) {
+        rawBlocks.push('sep');
       }
       const rawSrc = match[2];
-      blocks.push({
+      rawBlocks.push({
         type: 'image',
         src: rawSrc.startsWith('/') ? rawSrc : `/${rawSrc}`,
       });
@@ -405,8 +413,33 @@ export default class ProjectPageView extends Object3D {
 
     const textAfter = desc.slice(lastIndex);
     if (textAfter.trim()) {
-      blocks.push(...this.parseTextBlocks(textAfter));
+      rawBlocks.push(...this.parseTextBlocks(textAfter));
     }
+
+    // Phase 2: Consolidate consecutive images into image-row blocks
+    const blocks: ContentBlock[] = [];
+    let imageGroup: string[] = [];
+
+    const flushImages = (): void => {
+      if (imageGroup.length > 1) {
+        blocks.push({ type: 'image-row', sources: [...imageGroup] });
+      } else if (imageGroup.length === 1) {
+        blocks.push({ type: 'image', src: imageGroup[0] });
+      }
+      imageGroup = [];
+    };
+
+    for (const item of rawBlocks) {
+      if (item === 'sep') {
+        flushImages();
+      } else if (item.type === 'image') {
+        imageGroup.push(item.src);
+      } else {
+        flushImages();
+        blocks.push(item);
+      }
+    }
+    flushImages();
 
     return blocks;
   }
@@ -657,5 +690,45 @@ export default class ProjectPageView extends Object3D {
     });
 
     return startY - imageHeight;
+  }
+
+  private renderImageRow(
+    sources: string[],
+    left: number,
+    startY: number,
+    maxWidth: number,
+  ): number {
+    const aspects = sources.map(src => this.imageDims.get(src) ?? IMAGE_ASPECT);
+    const totalAspect = aspects.reduce((sum, a) => sum + a, 0);
+    const rowHeight = (maxWidth - (sources.length - 1) * IMAGE_ROW_GAP) / totalAspect;
+
+    let cursorX = left;
+    for (let i = 0; i < sources.length; i++) {
+      const imgWidth = rowHeight * aspects[i];
+      const centerX = cursorX + imgWidth / 2;
+
+      const geo = new PlaneGeometry(imgWidth, rowHeight);
+      const mat = new MeshBasicMaterial({ transparent: true, opacity: 0 });
+      const plane = new Mesh(geo, mat);
+      plane.position.set(centerX, startY - rowHeight / 2, 0);
+      this.add(plane);
+
+      const bloomFill = new Mesh(geo, new MeshBasicMaterial({ color: NeonColor.Black }));
+      bloomFill.layers.set(BLOOM_LAYER);
+      bloomFill.renderOrder = -1;
+      bloomFill.position.copy(plane.position);
+      this.add(bloomFill);
+
+      this.textureLoader.load(sources[i], (texture) => {
+        texture.colorSpace = SRGBColorSpace;
+        mat.map = texture;
+        mat.opacity = 1;
+        mat.needsUpdate = true;
+      });
+
+      cursorX += imgWidth + IMAGE_ROW_GAP;
+    }
+
+    return startY - rowHeight;
   }
 }

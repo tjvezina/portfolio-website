@@ -27,6 +27,9 @@ export type TextOptions = {
 }
 
 export default class Text extends Object3D {
+  /** Actual rendered bounding-box size of the text geometry. */
+  readonly textSize: Vector3;
+
   constructor(text: string, font: Font, options?: TextOptions) {
     super();
 
@@ -47,6 +50,7 @@ export default class Text extends Object3D {
     textGeometry.computeBoundingBox();
     textGeometry.boundingBox?.getSize(textSize);
     textGeometry.boundingBox?.getCenter(textCenter);
+    this.textSize = textSize;
 
     assert(Array.isArray(textGeometry.parameters.shapes), 'Expected shape array in TextGeometry');
     const letters = textGeometry.parameters.shapes.map(shape => {

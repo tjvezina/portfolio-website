@@ -7,7 +7,6 @@ import { NeonColor } from '@/core/neon-color';
 import ViewManager, { setInputEnabled } from '@/core/view-manager';
 import Text, { TextAlignX, TextAlignY } from '@/objects/text';
 import { updateBehaviours } from '@/utils/scene-utils';
-import { measureLineHeight, measureTextWidth } from '@/utils/text-utils';
 import IntroAnimation from '@/view/intro-animation';
 import StarField from '@/view/star-field';
 
@@ -114,10 +113,8 @@ export default class MainScene extends Scene {
       }
     });
 
-    const titleStr = 'TYLER J VEZINA';
-    const fontSize = 0.16 * App.pixelRatio;
-    const textW = measureTextWidth(titleStr, fontSize);
-    const textH = measureLineHeight(fontSize);
+    const textW = this.titleText.textSize.x;
+    const textH = this.titleText.textSize.y;
 
     // Plane extends beyond the text by this much on each side for the gradient fade
     const pad = textH * 2;
