@@ -7,6 +7,7 @@ import { Markdown } from 'tiptap-markdown';
 import { useEffect, useRef, useState } from 'react';
 
 import { importImage } from '../api';
+import { ImageGroup } from '../extensions/image-group';
 import './DescriptionEditor.css';
 
 interface DescriptionEditorProps {
@@ -33,6 +34,7 @@ export default function DescriptionEditor({
     extensions: [
       StarterKit,
       Image.configure({ inline: false }),
+      ImageGroup,
       Link.configure({
         openOnClick: false,
         HTMLAttributes: { rel: 'noopener noreferrer', target: '_blank' },
@@ -75,11 +77,19 @@ export default function DescriptionEditor({
     const files = Array.from(e.target.files ?? []);
     if (files.length === 0 || !editor) return;
     try {
+      const paths: string[] = [];
       for (const file of files) {
-        const path = await importImage(category, slug, 'screenshot', file);
-        editor.chain().focus().setImage({ src: `/${path}`, alt: '' }).run();
-        // Store the relative path as an attribute so we can extract it on save
-        // The src uses / prefix for display, but the markdown serializer will preserve it
+        paths.push(await importImage(category, slug, 'screenshot', file));
+      }
+      if (paths.length === 1) {
+        editor.chain().focus().insertContent(
+          { type: 'image', attrs: { src: `/${paths[0]}`, alt: '' } },
+        ).run();
+      } else {
+        editor.chain().focus().insertContent({
+          type: 'imageGroup',
+          content: paths.map((p) => ({ type: 'image', attrs: { src: `/${p}`, alt: '' } })),
+        }).run();
       }
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Image import failed');

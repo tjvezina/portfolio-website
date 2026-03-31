@@ -1,7 +1,8 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 
 import { importImage } from '../api';
 import './ImagePicker.css';
+import ThumbnailEditor from './ThumbnailEditor';
 
 interface ImagePickerProps {
   category: string;
@@ -19,24 +20,40 @@ export default function ImagePicker({
   onImported,
 }: ImagePickerProps): React.ReactElement {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [editingUrl, setEditingUrl] = useState<string | null>(null);
+  const [cacheBust, setCacheBust] = useState('');
 
-  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>): Promise<void> {
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>): void {
     const files = Array.from(e.target.files ?? []);
     if (files.length === 0) return;
+    const url = URL.createObjectURL(files[0]);
+    setEditingUrl(url);
+    if (inputRef.current) inputRef.current.value = '';
+  }
+
+  async function handleCropConfirm(blob: Blob): Promise<void> {
+    if (editingUrl) URL.revokeObjectURL(editingUrl);
+    setEditingUrl(null);
     try {
-      const path = await importImage(category, slug, 'thumbnail', files[0]);
+      const file = new File([blob], 'thumbnail.png', { type: 'image/png' });
+      const path = await importImage(category, slug, 'thumbnail', file);
+      setCacheBust(`?t=${Date.now()}`);
       onImported(path);
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Image import failed');
     }
-    if (inputRef.current) inputRef.current.value = '';
+  }
+
+  function handleCropCancel(): void {
+    if (editingUrl) URL.revokeObjectURL(editingUrl);
+    setEditingUrl(null);
   }
 
   return (
     <div className="image-picker">
       <img
         className="image-preview clickable"
-        src={currentPath ? `/${currentPath}` : PLACEHOLDER}
+        src={currentPath ? `/${currentPath}${cacheBust}` : PLACEHOLDER}
         alt="Thumbnail"
         onClick={() => slug && inputRef.current?.click()}
         title={slug ? 'Click to change thumbnail' : 'Save the project first'}
@@ -48,6 +65,13 @@ export default function ImagePicker({
         onChange={handleFileChange}
         style={{ display: 'none' }}
       />
+      {editingUrl && (
+        <ThumbnailEditor
+          imageUrl={editingUrl}
+          onConfirm={handleCropConfirm}
+          onCancel={handleCropCancel}
+        />
+      )}
     </div>
   );
 }

@@ -29,7 +29,7 @@
 .project-form input:focus,
 .project-form textarea:focus {
   outline: none;
-  border-color: #c0965a;
+  border-color: #5a9a5a;
 }
 
 .project-form input.input-error {
@@ -146,7 +146,7 @@
 }
 
 .tags-input-box:focus-within {
-  border-color: #c0965a;
+  border-color: #5a9a5a;
 }
 
 .tag-chip {
@@ -154,9 +154,9 @@
   align-items: center;
   gap: 4px;
   padding: 2px 8px;
-  border: 1px solid #c0965a;
+  border: 1px solid #5a9a5a;
   border-radius: 3px;
-  color: #d4a86a;
+  color: #6aaa6a;
   font-size: 0.82rem;
   white-space: nowrap;
 }
@@ -219,7 +219,7 @@
 
 .tag-suggestion.highlighted {
   background: #2a2a2e;
-  color: #d4a86a;
+  color: #6aaa6a;
 }
 
 /* Play URLs */
@@ -255,8 +255,8 @@
 }
 
 .play-urls-add:hover {
-  border-color: #c0965a;
-  color: #d4a86a;
+  border-color: #5a9a5a;
+  color: #6aaa6a;
 }
 
 .play-url-row {

@@ -39,8 +39,8 @@
 
 .editor-toolbar button.active {
   background: #2a2a2e;
-  color: #d4a86a;
-  border-color: #c0965a;
+  color: #6aaa6a;
+  border-color: #5a9a5a;
 }
 
 .editor-toolbar button:disabled {
@@ -76,7 +76,7 @@
 }
 
 .description-editor-content:focus-within {
-  border-color: #c0965a;
+  border-color: #5a9a5a;
 }
 
 /* TipTap editor content area */
@@ -96,13 +96,13 @@
 
 .description-editor .tiptap h2 {
   font-size: 1.1rem;
-  color: #d4a86a;
+  color: #6aaa6a;
   margin: 0.8em 0 0.4em;
 }
 
 .description-editor .tiptap h3 {
   font-size: 1rem;
-  color: #d4a86a;
+  color: #6aaa6a;
   margin: 0.6em 0 0.3em;
 }
 
@@ -137,6 +137,30 @@
   border-radius: 4px;
   margin: 0.5em 0;
   display: block;
+}
+
+.description-editor .tiptap img.ProseMirror-selectednode {
+  outline: 2px solid #5a9a5a;
+  outline-offset: 2px;
+}
+
+/* Image group: side-by-side layout */
+.description-editor .tiptap .image-group {
+  display: flex;
+  gap: 4px;
+  margin: 0.5em 0;
+}
+
+.description-editor .tiptap .image-group img {
+  flex: 1 1 0%;
+  min-width: 0;
+  object-fit: cover;
+  margin: 0;
+}
+
+/* Hide ProseMirror's default dropcursor when our custom image indicator is active */
+.description-editor-content.image-drag-active .ProseMirror-dropcursor {
+  display: none !important;
 }
 
 .description-editor .tiptap strong {
@@ -179,7 +203,7 @@
 }
 
 .link-bubble-input:focus {
-  border-color: #c0965a;
+  border-color: #5a9a5a;
 }
 
 .link-bubble-remove {

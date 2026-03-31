@@ -158,7 +158,8 @@ export default function editorApiPlugin(): Plugin {
 
       server.middlewares.use('/assets', (req, res, next) => {
         // Serve static files from repo-root assets/ for image previews
-        const filePath = path.resolve(ASSETS_DIR, (req.url ?? '').replace(/^\/+/, ''));
+        const urlPath = (req.url ?? '').split('?')[0];
+        const filePath = path.resolve(ASSETS_DIR, urlPath.replace(/^\/+/, ''));
         if (!filePath.startsWith(ASSETS_DIR)) return next();
         if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
           const ext = path.extname(filePath).toLowerCase();
@@ -173,6 +174,22 @@ export default function editorApiPlugin(): Plugin {
       server.middlewares.use(async (req, res, next) => {
         const url = req.url ?? '';
         if (!url.startsWith('/api/')) return next();
+
+        try { return await handleApi(req, res, next); }
+        catch (err: unknown) {
+          const code = (err as NodeJS.ErrnoException).code;
+          if (code === 'ECONNRESET' || code === 'ECONNABORTED') return;
+          if (!res.headersSent) sendError(res, 500, 'Internal server error');
+          else res.end();
+        }
+      });
+
+      async function handleApi(
+        req: import('http').IncomingMessage,
+        res: import('http').ServerResponse,
+        next: () => void,
+      ): Promise<void> {
+        const url = req.url ?? '';
 
         // GET /api/categories
         if (req.method === 'GET' && url === '/api/categories') {
@@ -339,7 +356,7 @@ export default function editorApiPlugin(): Plugin {
         }
 
         next();
-      });
+      }
     },
   };
 }

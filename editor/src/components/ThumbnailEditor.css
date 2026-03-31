@@ -1,0 +1,48 @@
+.thumbnail-editor {
+  background: #1e1e22;
+  border: 1px solid #2a2a2e;
+  border-radius: 8px;
+  padding: 24px;
+  width: 480px;
+  max-width: 90vw;
+}
+
+.thumbnail-editor h2 {
+  font-size: 1.1rem;
+  color: #6aaa6a;
+  margin-bottom: 4px;
+}
+
+.thumbnail-editor-hint {
+  font-size: 0.8rem;
+  color: #666;
+  margin-bottom: 16px;
+}
+
+.crop-container {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  background: #121214;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.zoom-control {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  margin-bottom: 20px;
+}
+
+.zoom-control label {
+  font-size: 0.85rem;
+  color: #888;
+  flex-shrink: 0;
+}
+
+.zoom-control input[type="range"] {
+  flex: 1;
+  accent-color: #5a9a5a;
+}
