@@ -1,4 +1,4 @@
-import { Object3D, PlaneGeometry, Vector3 } from 'three';
+import { Object3D, Vector3 } from 'three';
 
 import App, { HOME_AREA_WIDTH } from '@/core/app';
 import Wireframe from '@/objects/wireframe';
@@ -133,9 +133,10 @@ export default class GridTunnelTransition {
         : this.baseZ + TUNNEL_DISTANCE;
     } else {
       this.cameraHomePos = App.cameraRig.position.clone();
+      const cellWorld = grid.cellToWorld(selectedCol, selectedRow);
       this.cameraCellPos = new Vector3(
-        selectedCol * grid.cellSize + grid.position.x,
-        selectedRow * grid.cellSize + grid.position.y,
+        cellWorld.x + grid.position.x,
+        cellWorld.y + grid.position.y,
         App.cameraRig.position.z,
       );
       let maxDisp = Math.abs(this.selectedSettleStartZ - this.baseZ);
@@ -322,12 +323,11 @@ export default class GridTunnelTransition {
   // Swap helpers
   // ---------------------------------------------------------------------------
 
-  /** Swap the selected prism for a flat square at the front face position. */
+  /** Swap the selected prism for a flat face at the front face position. */
   private performSwap(): void {
     this.swapped = true;
-    const cs = this.grid.cellSize;
 
-    const square = new Wireframe(new PlaneGeometry(cs, cs), { color: this.grid.color });
+    const square = new Wireframe(this.grid.createFaceGeometry(), { color: this.grid.color });
     square.position.set(
       this.selectedObj.position.x,
       this.selectedObj.position.y,

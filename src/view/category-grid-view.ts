@@ -1,4 +1,4 @@
-import { BoxGeometry, Mesh, MeshBasicMaterial, Object3D, Plane, PlaneGeometry, SRGBColorSpace, TextureLoader, Vector3 } from 'three';
+import { BoxGeometry, BufferGeometry, MathUtils, Mesh, MeshBasicMaterial, Object3D, Plane, PlaneGeometry, SRGBColorSpace, TextureLoader, Vector3 } from 'three';
 
 import App from '@/core/app';
 import { NeonColor } from '@/core/neon-color';
@@ -7,12 +7,25 @@ import { ProjectArea, ProjectData } from '@/data/types';
 import Text from '@/objects/text';
 import Wireframe from '@/objects/wireframe';
 import { fitText } from '@/utils/text-utils';
+import { createHexFaceGeometry, createHexPrismGeometry, generateHexSpiralCoords, HEX_DIRECTIONS, hexDistance, hexToWorld } from '@/view/grid/hex-utils';
 
-/** How far (Chebyshev distance) the grid extends from the center cell. */
+/** How far (Chebyshev / hex ring distance) the grid extends from the center cell. */
 const MAX_GRID_RADIUS = 8;
 
-/** Duration in seconds for each wave's fold animation. */
+/** Duration in seconds for each wave's fold animation (square grids). */
 const WAVE_DURATION = 0.15;
+
+/** Duration of the initial hex face fade-in (icosahedron inner edges dissolving). */
+const HEX_FADE_IN_DURATION = 0.5;
+
+/** Base flight duration per hex ring distance (seconds per ring). */
+const HEX_FLIGHT_SPEED = 0.3;
+
+/** Minimum flight duration for the closest ring. */
+const HEX_FLIGHT_MIN = 0.15;
+
+/** Slight tilt (radians) applied to each hex during flight to prevent overlap. */
+const HEX_FLIGHT_TILT = MathUtils.degToRad(1);
 
 /** Depth of each prism extending behind the grid plane. */
 export const PRISM_DEPTH = 5;
@@ -39,15 +52,21 @@ function easeOutCubic(t: number): number {
   return 1 - Math.pow(1 - t, 3);
 }
 
+function easeInOutQuad(t: number): number {
+  return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+}
+
 interface FoldConfig {
-  axis: 'x' | 'y';
+  /** Rotation axis (unit vector in the XY plane, along the shared edge). */
+  axis: Vector3;
+  /** Start angle in radians (π/2 = folded behind grid plane). */
   startAngle: number;
 }
 
 interface WaveCell {
   col: number;
   row: number;
-  /** Direction from source cell to this cell: one of (±1,0) or (0,±1). */
+  /** Direction from source cell to this cell in grid coordinates. */
   dc: number;
   dr: number;
 }
@@ -64,14 +83,19 @@ export interface PrismData {
   thumbnailFadeIn?: number;
   overlay?: Object3D;
   hoverProgress?: number;
-  overlayMaterials?: { material: MeshBasicMaterial; targetOpacity: number }[];
+  overlayMaterials?: { material: MeshBasicMaterial, targetOpacity: number }[];
 }
 
 /** Generate (col, row) coordinates along a spiral from the center outward. */
 function generateSpiralCoords(count: number): [number, number][] {
   const coords: [number, number][] = [[0, 0]];
-  let x = 0, y = 0, dx = 1, dy = 0;
-  let steps = 1, stepsTaken = 0, turns = 0;
+  let x = 0;
+  let y = 0;
+  let dx = 1;
+  let dy = 0;
+  let steps = 1;
+  let stepsTaken = 0;
+  let turns = 0;
   while (coords.length < count) {
     x += dx;
     y += dy;
@@ -94,6 +118,11 @@ const COLLEGE_COORDS: [number, number][] = [
   [-1, -1], [0, -1], [1, -1],
 ];
 
+/** Cardinal directions for square grid BFS. */
+const SQUARE_DIRECTIONS: [number, number][] = [
+  [1, 0], [-1, 0], [0, 1], [0, -1],
+];
+
 export default class CategoryGridView extends Object3D {
   area: ProjectArea;
   onProjectClicked: ((project: ProjectData, col: number, row: number) => void) | null = null;
@@ -102,10 +131,15 @@ export default class CategoryGridView extends Object3D {
 
   readonly color: NeonColor;
 
-  // BFS wave unfold state
+  /** Whether this grid uses hexagonal cells. */
+  private get isHex(): boolean { return this.area === ProjectArea.Career; }
+
+  // BFS wave unfold state (square grids)
   private filledCells = new Set<string>();
   cellSize = 0;
-  private allWavePivots: Object3D[] = []; // every pivot ever created — for cleanup
+  /** Hex circumradius (half of cellSize for hex grids, cellSize for square). */
+  private get hexR(): number { return this.cellSize / 2; }
+  private allWavePivots: Object3D[] = [];
   private currentWavePivots: Object3D[] = [];
   private currentWaveConfigs: FoldConfig[] = [];
   private currentWaveCells: { col: number, row: number }[] = [];
@@ -113,6 +147,33 @@ export default class CategoryGridView extends Object3D {
   private waveElapsed = 0;
   private waveDuration = 0;
   private onAllWavesComplete: (() => void) | null = null;
+
+  // Hex crossfade state (planet ↔ hex face)
+  private hexFadeInActive = false;
+  private hexFadeInElapsed = 0;
+  private hexFadeInCallback: (() => void) | null = null;
+  private hexFadeOutTarget: Wireframe | null = null;
+  private hexFadeOutActive = false;
+  private hexFadeOutElapsed = 0;
+  private hexFadeOutCallback: (() => void) | null = null;
+  private hexFadeOutFace: Wireframe | null = null;
+  private hexFadeInPlanet: Wireframe | null = null;
+  private hexFadeInPlanetPos = new Vector3();
+  private hexFadeInPlanetScale = 1;
+
+  // Hex flight state (all cells fly from center simultaneously)
+  private hexFlightActive = false;
+  private hexFlightReverse = false;
+  private hexFlightElapsed = 0;
+  private hexFlightCells: {
+    face: Wireframe,
+    tgtX: number, tgtY: number,
+    col: number, row: number,
+    duration: number,
+    delay: number,
+    axis: Vector3,
+  }[] = [];
+  private hexFlightDeferred: { col: number, row: number }[] = [];
 
   // Prism grid state (active after unfold completes)
   prisms: PrismData[] = [];
@@ -139,21 +200,156 @@ export default class CategoryGridView extends Object3D {
     const projects = getCategoryData(area).projects;
     const coords = area === ProjectArea.College
       ? COLLEGE_COORDS
-      : generateSpiralCoords(projects.length);
+      : area === ProjectArea.Career
+        ? generateHexSpiralCoords(projects.length)
+        : generateSpiralCoords(projects.length);
     for (let i = 0; i < projects.length; i++) {
       const [col, row] = coords[i];
       this.projectMap.set(`${col},${row}`, projects[i]);
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Grid-type helpers
+  // ---------------------------------------------------------------------------
+
+  /** Convert grid coordinates to world-space XY. */
+  cellToWorld(col: number, row: number): { x: number, y: number } {
+    if (this.isHex) {
+      const v = hexToWorld(col, row, this.hexR);
+      return { x: v.x, y: v.y };
+    }
+    return { x: col * this.cellSize, y: row * this.cellSize };
+  }
+
+  /** Neighbor directions appropriate for this grid type. */
+  private get neighborDirections(): [number, number][] {
+    return this.isHex ? HEX_DIRECTIONS : SQUARE_DIRECTIONS;
+  }
+
+  /** Check whether a cell coordinate falls within the maximum grid radius. */
+  private inBounds(col: number, row: number): boolean {
+    if (this.isHex) return hexDistance(col, row) <= MAX_GRID_RADIUS;
+    return Math.abs(col) <= MAX_GRID_RADIUS && Math.abs(row) <= MAX_GRID_RADIUS;
+  }
+
+  /** Create a flat face geometry (hex or square) at the current cellSize. */
+  createFaceGeometry(): BufferGeometry {
+    if (this.isHex) return createHexFaceGeometry(this.hexR);
+    return new PlaneGeometry(this.cellSize, this.cellSize);
+  }
+
+  /** Create the prism body geometry (hex column or box). */
+  private createPrismGeometry(): BufferGeometry {
+    if (this.isHex) return createHexPrismGeometry(this.hexR, PRISM_DEPTH);
+    return new BoxGeometry(this.cellSize, this.cellSize, PRISM_DEPTH);
+  }
+
+  /** Build the first BFS wave: all direct neighbors of (0,0). */
+  private makeInitialWave(): WaveCell[] {
+    return this.neighborDirections.map(([dc, dr]) => ({
+      col: dc, row: dr, dc, dr,
+    }));
+  }
+
+  // ---------------------------------------------------------------------------
+  // Public interface
+  // ---------------------------------------------------------------------------
+
   /**
-   * Create and show the initial flat face square — the first cell of the unfolding animation.
+   * Create and show the initial flat face — the first cell of the unfolding animation.
    * Call this once when the planet focus transition completes.
    */
   showInitialFace(cellSize: number): void {
     if (this.initialFace) return;
-    this.initialFace = new Wireframe(new PlaneGeometry(cellSize, cellSize), { color: this.color });
+    this.cellSize = cellSize;
+    this.initialFace = new Wireframe(this.createFaceGeometry(), { color: this.color });
     this.add(this.initialFace);
+  }
+
+  /**
+   * Fade the initial hex face in from transparent over HEX_FADE_IN_DURATION seconds.
+   * The planet remains visible behind it so the inner triangle edges appear to dissolve.
+   * Calls onComplete when the fade finishes.
+   */
+  fadeInInitialFace(fadeOutTarget: Wireframe | null, onComplete: () => void): void {
+    if (!this.initialFace) { onComplete(); return; }
+
+    // Place the face in front of the planet (z=1) so depth ordering is correct
+    this.initialFace.position.z = 2;
+
+    // Set all hex materials to transparent at opacity 0.
+    // Disable depthWrite so the invisible hex doesn't occlude the planet
+    // in the depth buffer (especially the bloom-layer fill at z=2).
+    this.initialFace.lineMaterial.transparent = true;
+    this.initialFace.lineMaterial.opacity = 0;
+    this.initialFace.lineMaterial.depthWrite = false;
+    this.initialFace.traverse((child) => {
+      if (child instanceof Mesh) {
+        const mat = child.material as MeshBasicMaterial;
+        mat.transparent = true;
+        mat.opacity = 0;
+        mat.depthWrite = false;
+      }
+    });
+
+    // Prepare the planet wireframe for crossfade (opacity 1 → 0)
+    this.hexFadeOutTarget = fadeOutTarget;
+    if (fadeOutTarget) {
+      fadeOutTarget.lineMaterial.transparent = true;
+      fadeOutTarget.traverse((child) => {
+        if (child instanceof Mesh) {
+          (child.material as MeshBasicMaterial).transparent = true;
+        }
+      });
+    }
+
+    this.hexFadeInActive = true;
+    this.hexFadeInElapsed = 0;
+    this.hexFadeInCallback = onComplete;
+  }
+
+  /**
+   * Fade the center hex face out over HEX_FADE_IN_DURATION seconds while
+   * simultaneously fading the planet wireframe back in.  Reverse of fadeInInitialFace.
+   * Calls onComplete when the crossfade finishes.
+   */
+  fadeOutCenterFace(fadeInTarget: Wireframe | null, onComplete: () => void): void {
+    const face = this.squares.get('0,0');
+    if (!face) { onComplete(); return; }
+
+    // Position the face in front of the planet for correct layering
+    face.position.z = 2;
+    face.lineMaterial.depthWrite = false;
+    face.traverse((child) => {
+      if (child instanceof Mesh) {
+        const mat = child.material as MeshBasicMaterial;
+        mat.transparent = true;
+        mat.depthWrite = false;
+      }
+    });
+
+    // Prepare the planet wireframe for crossfade (opacity 0 → 1)
+    // Capture its position/scale so we can hold it each frame (homeView.update overrides it)
+    this.hexFadeInPlanet = fadeInTarget;
+    if (fadeInTarget) {
+      this.hexFadeInPlanetPos.copy(fadeInTarget.position);
+      this.hexFadeInPlanetScale = fadeInTarget.scale.x;
+      fadeInTarget.lineMaterial.transparent = true;
+      fadeInTarget.lineMaterial.opacity = 0;
+      fadeInTarget.traverse((child) => {
+        if (child instanceof Mesh) {
+          const mat = child.material as MeshBasicMaterial;
+          mat.transparent = true;
+          mat.opacity = 0;
+        }
+      });
+    }
+
+    this.hexFadeOutFace = face;
+    this.hexFadeOutActive = true;
+    this.hexFadeOutElapsed = 0;
+    this.hexFadeOutCallback = onComplete;
   }
 
   /**
@@ -167,31 +363,28 @@ export default class CategoryGridView extends Object3D {
     this.createPrism(0, 0);
     this.prismsActive = true;
 
-    const wave1: WaveCell[] = [
-      { col: 0, row: 1, dc: 0, dr: 1 },
-      { col: 0, row: -1, dc: 0, dr: -1 },
-      { col: 1, row: 0, dc: 1, dr: 0 },
-      { col: -1, row: 0, dc: -1, dr: 0 },
-    ];
-    this.fillRemainingCells(wave1);
+    this.fillRemainingCells(this.makeInitialWave());
   }
 
   /**
    * Begin the BFS unfold sequence.  The center cell (0,0) is already placed as
-   * initialFace; this creates wave 1 (the cross) and automatically launches each
-   * subsequent wave until MAX_GRID_RADIUS is filled.  All waves use WAVE_DURATION
-   * so the rhythm is uniform throughout.  Calls onComplete when all waves finish.
+   * initialFace; this creates wave 1 and automatically launches each subsequent
+   * wave until MAX_GRID_RADIUS is filled.  Calls onComplete when all waves finish.
    */
   startCrossUnfold(cellSize: number, onComplete?: () => void): void {
     this.cellSize = cellSize;
     this.onAllWavesComplete = onComplete ?? null;
 
-    // Remove all pivots from a previous visit
+    // Remove all pivots / bloom faces from a previous visit
     for (const pivot of this.allWavePivots) this.remove(pivot);
     this.allWavePivots = [];
     this.currentWavePivots = [];
     this.currentWaveConfigs = [];
     this.currentWaveCells = [];
+    for (const b of this.hexFlightCells) this.remove(b.face);
+    this.hexFlightCells = [];
+    this.hexFlightDeferred = [];
+    this.hexFlightActive = false;
 
     // Remove old prisms from a previous visit
     for (const { wireframe } of this.prisms) this.remove(wireframe);
@@ -211,20 +404,17 @@ export default class CategoryGridView extends Object3D {
     this.createPrism(0, 0);
     this.prismsActive = true;
 
-    // Wave 1: the four direct neighbours of (0,0)
-    const wave1: WaveCell[] = [
-      { col: 0, row: 1, dc: 0, dr: 1 },
-      { col: 0, row: -1, dc: 0, dr: -1 },
-      { col: 1, row: 0, dc: 1, dr: 0 },
-      { col: -1, row: 0, dc: -1, dr: 0 },
-    ];
-    this.launchWave(wave1, WAVE_DURATION);
+    if (this.isHex) {
+      this.startHexFlight();
+    } else {
+      this.launchWave(this.makeInitialWave(), WAVE_DURATION);
+    }
   }
 
   /**
-   * Begin the reverse fold sequence: settle prisms to base z, swap to squares,
-   * fold squares back in reverse wave order.  Calls onComplete when the center
-   * square is the only cell remaining.
+   * Begin the reverse fold sequence: settle prisms to base z, swap to flat faces,
+   * fold faces back in reverse wave order.  Calls onComplete when the center
+   * face is the only cell remaining.
    */
   startReverseFold(cellSize: number, onComplete: () => void): void {
     this.cellSize = cellSize;
@@ -246,7 +436,7 @@ export default class CategoryGridView extends Object3D {
     this.reverseFadeElapsed = 0;
   }
 
-  /** Remove the center square left after a completed reverse fold. */
+  /** Remove the center face left after a completed reverse fold. */
   removeCenterSquare(): void {
     const center = this.squares.get('0,0');
     if (center) {
@@ -262,7 +452,115 @@ export default class CategoryGridView extends Object3D {
       return;
     }
 
-    // Animate active unfold wave
+    // Hex initial face fade-in (crossfade: hex in, planet out)
+    if (this.hexFadeInActive && this.initialFace) {
+      this.hexFadeInElapsed += App.deltaTime;
+      const t = Math.min(1, this.hexFadeInElapsed / HEX_FADE_IN_DURATION);
+      const eased = 1 - (1 - t) * (1 - t); // easeOutQuad
+
+      // Fade hex in
+      this.initialFace.lineMaterial.opacity = eased;
+      this.initialFace.traverse((child) => {
+        if (child instanceof Mesh) {
+          (child.material as MeshBasicMaterial).opacity = eased;
+        }
+      });
+
+      // Fade planet out
+      if (this.hexFadeOutTarget) {
+        this.hexFadeOutTarget.lineMaterial.opacity = 1 - eased;
+        this.hexFadeOutTarget.traverse((child) => {
+          if (child instanceof Mesh) {
+            (child.material as MeshBasicMaterial).opacity = 1 - eased;
+          }
+        });
+      }
+
+      if (t >= 1) {
+        this.hexFadeInActive = false;
+        this.initialFace.position.z = 0;
+        // Restore depthWrite on hex materials
+        this.initialFace.lineMaterial.depthWrite = true;
+        this.initialFace.traverse((child) => {
+          if (child instanceof Mesh) {
+            (child.material as MeshBasicMaterial).depthWrite = true;
+          }
+        });
+        // Restore planet materials before hiding
+        if (this.hexFadeOutTarget) {
+          this.hexFadeOutTarget.lineMaterial.transparent = false;
+          this.hexFadeOutTarget.lineMaterial.opacity = 1;
+          this.hexFadeOutTarget.traverse((child) => {
+            if (child instanceof Mesh) {
+              const mat = child.material as MeshBasicMaterial;
+              mat.transparent = false;
+              mat.opacity = 1;
+            }
+          });
+          this.hexFadeOutTarget = null;
+        }
+        this.hexFadeInCallback?.();
+        this.hexFadeInCallback = null;
+      }
+    }
+
+    // Hex center face fade-out (crossfade: hex out, planet in)
+    if (this.hexFadeOutActive && this.hexFadeOutFace) {
+      this.hexFadeOutElapsed += App.deltaTime;
+      const t = Math.min(1, this.hexFadeOutElapsed / HEX_FADE_IN_DURATION);
+      const eased = 1 - (1 - t) * (1 - t); // easeOutQuad
+
+      // Fade hex out
+      this.hexFadeOutFace.lineMaterial.opacity = 1 - eased;
+      this.hexFadeOutFace.traverse((child) => {
+        if (child instanceof Mesh) {
+          (child.material as MeshBasicMaterial).opacity = 1 - eased;
+        }
+      });
+
+      // Fade planet in (re-pin position each frame since homeView.update overrides it)
+      if (this.hexFadeInPlanet) {
+        this.hexFadeInPlanet.position.copy(this.hexFadeInPlanetPos);
+        this.hexFadeInPlanet.scale.setScalar(this.hexFadeInPlanetScale);
+        this.hexFadeInPlanet.lineMaterial.opacity = eased;
+        this.hexFadeInPlanet.traverse((child) => {
+          if (child instanceof Mesh) {
+            (child.material as MeshBasicMaterial).opacity = eased;
+          }
+        });
+      }
+
+      if (t >= 1) {
+        this.hexFadeOutActive = false;
+        // Restore planet materials
+        if (this.hexFadeInPlanet) {
+          this.hexFadeInPlanet.lineMaterial.transparent = false;
+          this.hexFadeInPlanet.lineMaterial.opacity = 1;
+          this.hexFadeInPlanet.traverse((child) => {
+            if (child instanceof Mesh) {
+              const mat = child.material as MeshBasicMaterial;
+              mat.transparent = false;
+              mat.opacity = 1;
+            }
+          });
+          this.hexFadeInPlanet = null;
+        }
+        this.hexFadeOutFace = null;
+        this.hexFadeOutCallback?.();
+        this.hexFadeOutCallback = null;
+      }
+    }
+
+    // Hex flight animation (all cells fly from center simultaneously)
+    if (this.hexFlightActive) {
+      this.updateHexFlight();
+      if (!this.hexFlightActive) {
+        this.onAllWavesComplete?.();
+        this.onAllWavesComplete = null;
+      }
+    }
+
+    // Square fold wave animation
     if (this.waveActive) {
       this.waveElapsed += App.deltaTime;
       const t = Math.min(1, this.waveElapsed / this.waveDuration);
@@ -272,21 +570,15 @@ export default class CategoryGridView extends Object3D {
         const pivot = this.currentWavePivots[i];
         const cfg = this.currentWaveConfigs[i];
         const angle = cfg.startAngle * (1 - eased);
-        if (cfg.axis === 'x') {
-          pivot.rotation.x = angle;
-        } else {
-          pivot.rotation.y = angle;
-        }
+        pivot.quaternion.setFromAxisAngle(cfg.axis, angle);
       }
 
       if (t >= 1) {
-        // Remove this wave's pivots and replace with prisms
         for (let i = 0; i < this.currentWavePivots.length; i++) {
           this.remove(this.currentWavePivots[i]);
           const cell = this.currentWaveCells[i];
           this.createPrism(cell.col, cell.row);
         }
-        // Remove completed pivots from the allWavePivots tracking list
         const completed = new Set(this.currentWavePivots);
         this.allWavePivots = this.allWavePivots.filter(p => !completed.has(p));
 
@@ -336,7 +628,7 @@ export default class CategoryGridView extends Object3D {
   /** Reset all prism wireframes to their base grid positions. */
   resetPrismPositions(): void {
     for (const prism of this.prisms) {
-      // Restore original wireframe if it was swapped for a square during a transition
+      // Restore original wireframe if it was swapped for a flat face during a transition
       if (prism.originalWireframe) {
         if (prism.wireframe.parent) prism.wireframe.parent.remove(prism.wireframe);
         this.add(prism.originalWireframe);
@@ -390,61 +682,69 @@ export default class CategoryGridView extends Object3D {
       }
 
       if (t >= 1) {
-        this.swapPrismsToSquares();
-        this.cullOffscreenSquares();
+        this.swapPrismsToFaces();
+        this.cullOffscreenFaces();
         this.reversePhase = 'folding';
-        this.launchReverseWave();
+        if (this.isHex) {
+          this.startReverseHexFlight();
+        } else {
+          this.launchReverseWave();
+        }
       }
       return;
     }
 
-    if (this.reversePhase === 'folding' && this.waveActive) {
-      this.waveElapsed += App.deltaTime;
-      const t = Math.min(1, this.waveElapsed / this.waveDuration);
-      const eased = easeOutCubic(t);
-
-      for (let i = 0; i < this.currentWavePivots.length; i++) {
-        const pivot = this.currentWavePivots[i];
-        const cfg = this.currentWaveConfigs[i];
-        // Reverse: fold from flat (0°) to folded (startAngle)
-        const angle = cfg.startAngle * eased;
-        if (cfg.axis === 'x') {
-          pivot.rotation.x = angle;
-        } else {
-          pivot.rotation.y = angle;
-        }
-      }
-
-      if (t >= 1) {
-        for (const pivot of this.currentWavePivots) this.remove(pivot);
-        this.currentWavePivots = [];
-        this.currentWaveConfigs = [];
-        this.currentWaveCells = [];
-        this.waveActive = false;
-
-        this.reverseWaveIndex--;
-        if (this.reverseWaveIndex >= 0) {
-          this.launchReverseWave();
-        } else {
-          // All waves folded back — only center square remains
+    if (this.reversePhase === 'folding') {
+      if (this.hexFlightActive) {
+        // Hex reverse flight (all cells fly back to center)
+        this.updateHexFlight();
+        if (!this.hexFlightActive) {
           this.reversePhase = 'idle';
           this.onReverseFoldComplete?.();
           this.onReverseFoldComplete = null;
+        }
+      } else if (this.waveActive) {
+        // Square reverse fold
+        this.waveElapsed += App.deltaTime;
+        const t = Math.min(1, this.waveElapsed / this.waveDuration);
+        const eased = easeOutCubic(t);
+
+        for (let i = 0; i < this.currentWavePivots.length; i++) {
+          const pivot = this.currentWavePivots[i];
+          const cfg = this.currentWaveConfigs[i];
+          const angle = cfg.startAngle * eased;
+          pivot.quaternion.setFromAxisAngle(cfg.axis, angle);
+        }
+
+        if (t >= 1) {
+          for (const pivot of this.currentWavePivots) this.remove(pivot);
+          this.currentWavePivots = [];
+          this.currentWaveConfigs = [];
+          this.currentWaveCells = [];
+          this.waveActive = false;
+
+          this.reverseWaveIndex--;
+          if (this.reverseWaveIndex >= 0) {
+            this.launchReverseWave();
+          } else {
+            this.reversePhase = 'idle';
+            this.onReverseFoldComplete?.();
+            this.onReverseFoldComplete = null;
+          }
         }
       }
     }
   }
 
-  /** Replace all prisms with flat squares at the same grid positions. */
-  private swapPrismsToSquares(): void {
-    const cs = this.cellSize;
+  /** Replace all prisms with flat faces at the same grid positions. */
+  private swapPrismsToFaces(): void {
     this.squares.clear();
     for (const { wireframe, col, row, cx, cy } of this.prisms) {
       this.remove(wireframe);
-      const square = new Wireframe(new PlaneGeometry(cs, cs), { color: this.color });
-      square.position.set(cx, cy, 0);
-      this.add(square);
-      this.squares.set(`${col},${row}`, square);
+      const face = new Wireframe(this.createFaceGeometry(), { color: this.color });
+      face.position.set(cx, cy, 0);
+      this.add(face);
+      this.squares.set(`${col},${row}`, face);
     }
     this.prisms = [];
   }
@@ -454,19 +754,18 @@ export default class CategoryGridView extends Object3D {
     const cam = App.camera;
     const halfW = cam.right;
     const halfH = cam.top;
-    const margin = this.cellSize / 2;
+    const margin = this.cellSize;
     return wave.some(({ col, row }) => {
-      const cx = col * this.cellSize;
-      const cy = row * this.cellSize;
+      const { x: cx, y: cy } = this.cellToWorld(col, row);
       return Math.abs(cx) < halfW + margin && Math.abs(cy) < halfH + margin;
     });
   }
 
   /**
-   * Remove all squares from waves that are entirely off-screen and adjust
+   * Remove all faces from waves that are entirely off-screen and adjust
    * reverseWaveIndex so the fold animation starts from the first visible wave.
    */
-  private cullOffscreenSquares(): void {
+  private cullOffscreenFaces(): void {
     // Walk inward from the outermost wave to find the first with a visible cell
     let firstVisible = 0;
     for (let i = this.reverseWaves.length - 1; i >= 0; i--) {
@@ -476,13 +775,13 @@ export default class CategoryGridView extends Object3D {
       }
     }
 
-    // Instantly remove squares for all waves beyond the first visible one
+    // Instantly remove faces for all waves beyond the first visible one
     for (let i = this.reverseWaves.length - 1; i > firstVisible; i--) {
       for (const { col, row } of this.reverseWaves[i]) {
         const key = `${col},${row}`;
-        const square = this.squares.get(key);
-        if (square) {
-          this.remove(square);
+        const face = this.squares.get(key);
+        if (face) {
+          this.remove(face);
           this.squares.delete(key);
         }
       }
@@ -510,42 +809,31 @@ export default class CategoryGridView extends Object3D {
     }
   }
 
-  /** Launch the next reverse wave (outermost → innermost). */
+  /** Launch the next reverse wave (outermost → innermost, square grids only). */
   private launchReverseWave(): void {
     const wave = this.reverseWaves[this.reverseWaveIndex];
-    const cs = this.cellSize;
 
     for (const { col, row, dc, dr } of wave) {
-      // Remove the square for this cell
       const key = `${col},${row}`;
-      const square = this.squares.get(key);
-      if (square) {
-        this.remove(square);
+      const face = this.squares.get(key);
+      if (face) {
+        this.remove(face);
         this.squares.delete(key);
       }
 
-      // Create pivot on the shared edge (same geometry as forward unfold)
-      const pivotX = (col - dc) * cs + dc * cs / 2;
-      const pivotY = (row - dr) * cs + dr * cs / 2;
+      const { pivotX, pivotY, faceOffsetX, faceOffsetY, foldAxis } =
+        this.computeFoldPivot(col, row, dc, dr);
 
       const pivot = new Object3D();
       pivot.position.set(pivotX, pivotY, 0);
 
-      const face = new Wireframe(new PlaneGeometry(cs, cs), { color: this.color });
-      face.position.set(dc * cs / 2, dr * cs / 2, 0);
-      pivot.add(face);
-
-      // Target angle matches the forward start angle
-      let targetAngle: number;
-      if (dc !== 0) {
-        targetAngle = dc * Math.PI / 2;
-      } else {
-        targetAngle = -dr * Math.PI / 2;
-      }
+      const faceGeo = new Wireframe(this.createFaceGeometry(), { color: this.color });
+      faceGeo.position.set(faceOffsetX, faceOffsetY, 0);
+      pivot.add(faceGeo);
 
       this.add(pivot);
       this.currentWavePivots.push(pivot);
-      this.currentWaveConfigs.push({ axis: dc !== 0 ? 'y' : 'x', startAngle: targetAngle });
+      this.currentWaveConfigs.push({ axis: foldAxis, startAngle: Math.PI / 2 });
       this.currentWaveCells.push({ col, row });
     }
 
@@ -559,6 +847,28 @@ export default class CategoryGridView extends Object3D {
   // ---------------------------------------------------------------------------
 
   /**
+   * Compute the pivot position, face offset, and fold axis for a cell being
+   * unfolded from its source cell.
+   */
+  private computeFoldPivot(col: number, row: number, dc: number, dr: number): {
+    pivotX: number,
+    pivotY: number,
+    faceOffsetX: number,
+    faceOffsetY: number,
+    foldAxis: Vector3,
+  } {
+    const sourceWorld = this.cellToWorld(col - dc, row - dr);
+    const targetWorld = this.cellToWorld(col, row);
+    const pivotX = (sourceWorld.x + targetWorld.x) / 2;
+    const pivotY = (sourceWorld.y + targetWorld.y) / 2;
+    const faceOffsetX = (targetWorld.x - sourceWorld.x) / 2;
+    const faceOffsetY = (targetWorld.y - sourceWorld.y) / 2;
+    // Fold axis: perpendicular to direction in XY plane, oriented so +π/2 folds behind
+    const foldAxis = new Vector3(-faceOffsetY * 2, faceOffsetX * 2, 0).normalize();
+    return { pivotX, pivotY, faceOffsetX, faceOffsetY, foldAxis };
+  }
+
+  /**
    * Compute all BFS waves from center outward, without modifying instance state.
    * Used by the reverse fold to process waves in reverse order.
    */
@@ -567,12 +877,7 @@ export default class CategoryGridView extends Object3D {
     const filled = new Set<string>();
     filled.add('0,0');
 
-    const wave1: WaveCell[] = [
-      { col: 0, row: 1, dc: 0, dr: 1 },
-      { col: 0, row: -1, dc: 0, dr: -1 },
-      { col: 1, row: 0, dc: 1, dr: 0 },
-      { col: -1, row: 0, dc: -1, dr: 0 },
-    ];
+    const wave1 = this.makeInitialWave();
     for (const cell of wave1) filled.add(`${cell.col},${cell.row}`);
     waves.push(wave1);
 
@@ -590,30 +895,36 @@ export default class CategoryGridView extends Object3D {
    * BFS: find the next ring of empty cells adjacent to the given filled set.
    */
   private computeNextWaveFrom(filled: Set<string>): WaveCell[] {
-    const R = MAX_GRID_RADIUS;
-    const candidates = new Map<string, WaveCell & { horizontal: boolean }>();
+    const dirs = this.neighborDirections;
+    const candidates = new Map<string, WaveCell & { horizontal?: boolean }>();
 
     for (const key of filled) {
       const comma = key.indexOf(',');
       const col = parseInt(key.slice(0, comma), 10);
       const row = parseInt(key.slice(comma + 1), 10);
 
-      for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as [number, number][]) {
+      for (const [dc, dr] of dirs) {
         const nc = col + dc;
         const nr = row + dr;
 
-        if (Math.abs(nc) > R || Math.abs(nr) > R) continue;
+        if (!this.inBounds(nc, nr)) continue;
 
         const nk = `${nc},${nr}`;
         if (filled.has(nk)) continue;
 
-        const isHorizontal = dc !== 0;
-
-        if (!candidates.has(nk)) {
-          candidates.set(nk, { col: nc, row: nr, dc, dr, horizontal: isHorizontal });
-        } else if (!candidates.get(nk)!.horizontal && isHorizontal) {
-          // Upgrade to horizontal source
-          candidates.set(nk, { col: nc, row: nr, dc, dr, horizontal: isHorizontal });
+        if (!this.isHex) {
+          // Square grid: prefer horizontal fold sources for visual consistency
+          const isHorizontal = dc !== 0;
+          if (!candidates.has(nk)) {
+            candidates.set(nk, { col: nc, row: nr, dc, dr, horizontal: isHorizontal });
+          } else if (!candidates.get(nk)!.horizontal && isHorizontal) {
+            candidates.set(nk, { col: nc, row: nr, dc, dr, horizontal: isHorizontal });
+          }
+        } else {
+          // Hex grid: first source found wins
+          if (!candidates.has(nk)) {
+            candidates.set(nk, { col: nc, row: nr, dc, dr });
+          }
         }
       }
     }
@@ -641,9 +952,8 @@ export default class CategoryGridView extends Object3D {
   /** Create a single prism at the given grid cell and add it to the prism list. */
   private createPrism(col: number, row: number): void {
     const cs = this.cellSize;
-    const prism = new Wireframe(new BoxGeometry(cs, cs, PRISM_DEPTH), { color: this.color });
-    const cx = col * cs;
-    const cy = row * cs;
+    const prism = new Wireframe(this.createPrismGeometry(), { color: this.color });
+    const { x: cx, y: cy } = this.cellToWorld(col, row);
     prism.position.set(cx, cy, -PRISM_DEPTH / 2);
     this.add(prism);
 
@@ -654,7 +964,9 @@ export default class CategoryGridView extends Object3D {
     if (project) {
       // Thumbnail texture on front face (starts invisible, fades in when loaded)
       const thumbnailSrc = project.thumbnail ?? '/assets/default-thumbnail.png';
-      const thumbnailGeo = new PlaneGeometry(cs, cs);
+      const thumbnailGeo = this.isHex
+        ? createHexFaceGeometry(this.hexR)
+        : new PlaneGeometry(cs, cs);
       const thumbnailMat = new MeshBasicMaterial({ transparent: true, opacity: 0 });
       const thumbnailMesh = new Mesh(thumbnailGeo, thumbnailMat);
       thumbnailMesh.position.z = PRISM_DEPTH / 2 + 0.01;
@@ -677,10 +989,14 @@ export default class CategoryGridView extends Object3D {
       overlay.visible = false;
 
       const dimMat = new MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0 });
-      overlay.add(new Mesh(new PlaneGeometry(cs, cs), dimMat));
+      const dimGeo = this.isHex ? createHexFaceGeometry(this.hexR) : new PlaneGeometry(cs, cs);
+      overlay.add(new Mesh(dimGeo, dimMat));
 
-      const maxWidth = cs * 0.85;
-      const { lines: titleLines, size: titleSize } = fitText(project.title, cs * 0.09, maxWidth);
+      // Use the inner width (apothem for hex, half-edge for square) for text sizing
+      const hexOrSquare = this.isHex ? this.hexR : cs;
+      const effectiveWidth = this.isHex ? hexOrSquare * Math.sqrt(3) : cs;
+      const maxWidth = effectiveWidth * 0.85;
+      const { lines: titleLines, size: titleSize } = fitText(project.title, hexOrSquare * 0.09, maxWidth);
       const lineHeight = titleSize * 1.4;
       const titleBlockHeight = lineHeight * titleLines.length;
       const topY = titleBlockHeight / 2;
@@ -729,7 +1045,9 @@ export default class CategoryGridView extends Object3D {
     const localX = intersect.x - gridWorld.x;
     const localY = intersect.y - gridWorld.y;
 
-    const halfCell = this.cellSize / 2;
+    // Inner radius for proximity falloff (apothem for hex, half-edge for square)
+    const innerR = this.isHex ? this.hexR * Math.sqrt(3) / 2 : this.cellSize / 2;
+
     let newHovered: PrismData | null = null;
 
     for (const prismData of this.prisms) {
@@ -740,18 +1058,21 @@ export default class CategoryGridView extends Object3D {
 
       // Smooth falloff: full extension inside the cell, fading to zero over PRISM_EFFECT_RADIUS
       const t = 1 - Math.sin(Math.min(Math.PI / 2,
-        (Math.PI * Math.max(0, dist - halfCell)) / (2 * PRISM_EFFECT_RADIUS)));
+        (Math.PI * Math.max(0, dist - innerR)) / (2 * PRISM_EFFECT_RADIUS)));
       const extension = t * t * t * PRISM_MAX_EXTENSION;
 
       const targetZ = -PRISM_DEPTH / 2 + extension;
       wireframe.position.z += (targetZ - wireframe.position.z) * (1 - Math.exp(-PRISM_LERP_SPEED * App.deltaTime));
 
       // Detect hover: cursor within this project cell's bounds
-      if (didIntersect && prismData.project &&
-          Math.abs(dx) <= halfCell && Math.abs(dy) <= halfCell) {
-        newHovered = prismData;
+      if (didIntersect && prismData.project) {
+        const inside = this.isHex
+          ? this.isInsideHex(dx, dy)
+          : Math.abs(dx) <= this.cellSize / 2 && Math.abs(dy) <= this.cellSize / 2;
+        if (inside) {
+          newHovered = prismData;
+        }
       }
-
     }
 
     // Drive hover overlay fade animations
@@ -771,39 +1092,36 @@ export default class CategoryGridView extends Object3D {
     }
   }
 
-  /** Instantiate pivots for a wave and start the animation. */
-  private launchWave(cells: WaveCell[], duration: number): void {
-    const cs = this.cellSize;
+  /** Point-in-hexagon test for a pointy-top regular hex with circumradius hexR. */
+  private isInsideHex(dx: number, dy: number): boolean {
+    const R = this.hexR;
+    const ax = Math.abs(dx);
+    const ay = Math.abs(dy);
+    return ax <= R * Math.sqrt(3) / 2 && ay <= R - ax / Math.sqrt(3);
+  }
 
+  /** Instantiate pivots for a wave and start the fold animation (square grids only). */
+  private launchWave(cells: WaveCell[], duration: number): void {
     for (const { col, row, dc, dr } of cells) {
       this.filledCells.add(`${col},${row}`);
 
-      // Hinge sits on the shared edge between source and target cell centres
-      const pivotX = (col - dc) * cs + dc * cs / 2;
-      const pivotY = (row - dr) * cs + dr * cs / 2;
+      const { pivotX, pivotY, faceOffsetX, faceOffsetY, foldAxis } =
+        this.computeFoldPivot(col, row, dc, dr);
 
       const pivot = new Object3D();
       pivot.position.set(pivotX, pivotY, 0);
 
-      // Face is offset from pivot toward the target cell centre
-      const face = new Wireframe(new PlaneGeometry(cs, cs), { color: this.color });
-      face.position.set(dc * cs / 2, dr * cs / 2, 0);
+      const face = new Wireframe(this.createFaceGeometry(), { color: this.color });
+      face.position.set(faceOffsetX, faceOffsetY, 0);
       pivot.add(face);
 
-      // Initial rotation: folded 90° behind
-      let startAngle: number;
-      if (dc !== 0) {
-        startAngle = dc * Math.PI / 2; // y-axis: +1 → +90°, -1 → -90°
-        pivot.rotation.y = startAngle;
-      } else {
-        startAngle = -dr * Math.PI / 2; // x-axis: +1 → -90°, -1 → +90°
-        pivot.rotation.x = startAngle;
-      }
+      const startAngle = Math.PI / 2;
+      pivot.quaternion.setFromAxisAngle(foldAxis, startAngle);
 
       this.add(pivot);
       this.allWavePivots.push(pivot);
       this.currentWavePivots.push(pivot);
-      this.currentWaveConfigs.push({ axis: dc !== 0 ? 'y' : 'x', startAngle });
+      this.currentWaveConfigs.push({ axis: foldAxis, startAngle });
       this.currentWaveCells.push({ col, row });
     }
 
@@ -812,4 +1130,126 @@ export default class CategoryGridView extends Object3D {
     this.waveActive = true;
   }
 
+  // ---------------------------------------------------------------------------
+  // Hex flight (all cells fly from/to center simultaneously)
+  // ---------------------------------------------------------------------------
+
+  /** Start the forward hex flight: all cells begin behind center and fly out. */
+  private startHexFlight(): void {
+    this.hexFlightCells = [];
+    this.hexFlightActive = true;
+    this.hexFlightReverse = false;
+    this.hexFlightElapsed = 0;
+
+    const cam = App.camera;
+    const margin = this.cellSize;
+
+    for (let ring = 1; ring <= MAX_GRID_RADIUS; ring++) {
+      let q = -ring;
+      let r = 0;
+      const clockwiseDirs: [number, number][] = [
+        [0, 1], [1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1],
+      ];
+      for (const [dq, dr] of clockwiseDirs) {
+        for (let step = 0; step < ring; step++) {
+          const tgt = this.cellToWorld(q, r);
+          const offScreen = Math.abs(tgt.x) >= cam.right + margin
+            || Math.abs(tgt.y) >= cam.top + margin;
+          if (offScreen) {
+            this.hexFlightDeferred.push({ col: q, row: r });
+          } else {
+            const face = new Wireframe(this.createFaceGeometry(), { color: this.color });
+            face.position.set(0, 0, -0.1);
+            const axis = new Vector3(tgt.x, tgt.y, 0).normalize();
+            face.setRotationFromAxisAngle(axis, HEX_FLIGHT_TILT);
+            this.add(face);
+            const dist = hexDistance(q, r);
+            this.hexFlightCells.push({
+              face, tgtX: tgt.x, tgtY: tgt.y, col: q, row: r,
+              duration: Math.max(HEX_FLIGHT_MIN, dist * HEX_FLIGHT_SPEED),
+              delay: 0,
+              axis,
+            });
+          }
+          q += dq;
+          r += dr;
+        }
+      }
+    }
+  }
+
+  /** Start the reverse hex flight: all faces fly back to center. */
+  private startReverseHexFlight(): void {
+    this.hexFlightCells = [];
+    this.hexFlightActive = true;
+    this.hexFlightReverse = true;
+    this.hexFlightElapsed = 0;
+
+    // Build cells with durations first
+    let maxDuration = 0;
+    for (const [key, face] of this.squares) {
+      if (key === '0,0') continue;
+      const [col, row] = key.split(',').map(Number);
+      const tgt = this.cellToWorld(col, row);
+      this.squares.delete(key);
+      const dist = hexDistance(col, row);
+      const duration = Math.max(HEX_FLIGHT_MIN, dist * HEX_FLIGHT_SPEED);
+      maxDuration = Math.max(maxDuration, duration);
+      const axis = new Vector3(tgt.x, tgt.y, 0).normalize();
+      this.hexFlightCells.push({
+        face, tgtX: tgt.x, tgtY: tgt.y, col, row,
+        duration, delay: 0, axis,
+      });
+    }
+
+    // Stagger starts so all cells arrive at center at the same time
+    for (const c of this.hexFlightCells) {
+      c.delay = maxDuration - c.duration;
+    }
+  }
+
+  /** Drive all hex flight cells each frame. */
+  private updateHexFlight(): void {
+    this.hexFlightElapsed += App.deltaTime;
+
+    let allDone = true;
+    for (const c of this.hexFlightCells) {
+      const localElapsed = this.hexFlightElapsed - c.delay;
+      const t = Math.min(1, Math.max(0, localElapsed) / c.duration);
+      const eased = easeInOutQuad(t);
+
+      if (this.hexFlightReverse) {
+        // Fly from grid position back to center
+        c.face.position.x = c.tgtX + (0 - c.tgtX) * eased;
+        c.face.position.y = c.tgtY + (0 - c.tgtY) * eased;
+        c.face.position.z = -0.1 * eased;
+        c.face.setRotationFromAxisAngle(c.axis, HEX_FLIGHT_TILT * eased);
+      } else {
+        // Fly from center to grid position
+        c.face.position.x = c.tgtX * eased;
+        c.face.position.y = c.tgtY * eased;
+        c.face.position.z = -0.1 + 0.1 * eased;
+        c.face.setRotationFromAxisAngle(c.axis, HEX_FLIGHT_TILT * (1 - eased));
+      }
+
+      if (t < 1) allDone = false;
+    }
+
+    if (allDone) {
+      // Clean up all flight faces and create prisms
+      for (const c of this.hexFlightCells) {
+        this.remove(c.face);
+        if (!this.hexFlightReverse) {
+          this.createPrism(c.col, c.row);
+        }
+      }
+      this.hexFlightCells = [];
+      // Create deferred off-screen prisms now that animation is done
+      for (const { col, row } of this.hexFlightDeferred) {
+        this.createPrism(col, row);
+      }
+      this.hexFlightDeferred = [];
+      this.hexFlightActive = false;
+    }
+  }
 }

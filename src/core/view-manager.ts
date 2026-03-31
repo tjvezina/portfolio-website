@@ -1,4 +1,4 @@
-import { MeshBasicMaterial, Object3D, PlaneGeometry, Vector3 } from 'three';
+import { MeshBasicMaterial, Object3D, Vector3 } from 'three';
 
 import App, { HOME_AREA_WIDTH } from '@/core/app';
 import { NeonColor } from '@/core/neon-color';
@@ -16,16 +16,23 @@ import PlanetFocusTransition, { computeFaceUpQuat } from '@/view/transition/plan
 
 export { setInputEnabled };
 
-const GRID_COLS = 4.5;
+/** Number of cell widths that fit across HOME_AREA_WIDTH.
+ *  For squares, cell width = edge length.
+ *  For hexagons (pointy-top), cell width = 2 × circumradius (vertex-to-vertex). */
+const GRID_COLS: Record<ProjectArea, number> = {
+  [ProjectArea.College]: 4.5,
+  [ProjectArea.Personal]: 4.5,
+  [ProjectArea.Career]: 4.5,
+};
 
 const PHI = (1 + Math.sqrt(5)) / 2;
 
-// World-space edge length of each planet's faces, used to size grid cells.
-// Career (icosahedron → hex) cell size is TBD — using icosahedron edge as placeholder.
+// World-space visual cell size of each planet's face, used to compute grid scale.
+// For squares: edge length.  For hex: vertex-to-vertex diameter (2 × circumradius).
 const PLANET_EDGE_SIZE: Record<ProjectArea, number> = {
   [ProjectArea.College]: 0.9,
   [ProjectArea.Personal]: 0.75 * Math.SQRT2,
-  [ProjectArea.Career]: 0.75 * 2 / Math.sqrt(1 + PHI * PHI),
+  [ProjectArea.Career]: 0.75 * 4 * PHI / Math.sqrt(3 * (2 + PHI)),
 };
 
 const CATEGORY_COLORS: Record<ProjectArea, NeonColor> = {
@@ -235,7 +242,7 @@ export default class ViewManager extends Object3D {
       grid.position.set(0, 0, 0);
 
       // Planet flies to screen center and scales up to fill the grid area
-      const targetScale = (HOME_AREA_WIDTH / GRID_COLS) / PLANET_EDGE_SIZE[area];
+      const targetScale = (HOME_AREA_WIDTH / GRID_COLS[area]) / PLANET_EDGE_SIZE[area];
       const otherPlanets = this.homeView.planetList.filter(p => p.area !== area);
       this.activePlanetFocus = new PlanetFocusTransition(
         planet, otherPlanets, this.homeView.sun, targetScale, 1.2,
@@ -280,12 +287,26 @@ export default class ViewManager extends Object3D {
       if (grid) {
         grid.disableInput();
 
-        const cellSize = HOME_AREA_WIDTH / GRID_COLS;
-        grid.startReverseFold(cellSize, () => {
+        const cellSize = HOME_AREA_WIDTH / GRID_COLS[area];
+        const startReverseFocus = (): void => {
           grid.removeCenterSquare();
           grid.visible = false;
           grid.scale.setScalar(1);
 
+          const planet = this.homeView.planetList.find(p => p.area === area);
+
+          // Start reverse planet focus transition
+          if (planet) {
+            planet.tumble.resume();
+            const targetScale = (HOME_AREA_WIDTH / GRID_COLS[area]) / PLANET_EDGE_SIZE[area];
+            const otherPlanets = this.homeView.planetList.filter(p => p.area !== area);
+            this.activePlanetFocus = new PlanetFocusTransition(
+              planet, otherPlanets, this.homeView.sun, targetScale, 1.2, true,
+            );
+          }
+        };
+
+        grid.startReverseFold(cellSize, () => {
           // Swap back to orthographic camera
           App.swapToOrthographic();
 
@@ -294,14 +315,24 @@ export default class ViewManager extends Object3D {
           const planet = this.homeView.planetList.find(p => p.area === area);
           if (planet) planet.wireframe.visible = true;
 
-          // Start reverse planet focus transition
-          if (planet) {
-            planet.tumble.resume();
-            const targetScale = (HOME_AREA_WIDTH / GRID_COLS) / PLANET_EDGE_SIZE[area];
+          if (area === ProjectArea.Career) {
+            // Hide other planets and sun during the hex fade-out; the
+            // PlanetFocusTransition in startReverseFocus will reveal them.
             const otherPlanets = this.homeView.planetList.filter(p => p.area !== area);
-            this.activePlanetFocus = new PlanetFocusTransition(
-              planet, otherPlanets, this.homeView.sun, targetScale, 1.2, true,
-            );
+            for (const p of otherPlanets) {
+              p.wireframe.scale.setScalar(0);
+            }
+            this.homeView.sun.scale.setScalar(0);
+
+            // Crossfade center hex face out, planet in, then start reverse focus
+            const targetScale = (HOME_AREA_WIDTH / GRID_COLS[area]) / PLANET_EDGE_SIZE[area];
+            if (planet) {
+              planet.wireframe.position.set(0, 0, 1);
+              planet.wireframe.scale.setScalar(targetScale);
+            }
+            grid.fadeOutCenterFace(planet?.wireframe ?? null, startReverseFocus);
+          } else {
+            startReverseFocus();
           }
         });
       }
@@ -343,8 +374,9 @@ export default class ViewManager extends Object3D {
     // Create the project page at the destination camera position in world space,
     // so the prism grid occludes it as it flies past.
     if (grid && this.clickedProjectCol !== null && this.clickedProjectRow !== null) {
-      const destX = this.clickedProjectCol * grid.cellSize + grid.position.x;
-      const destY = this.clickedProjectRow * grid.cellSize + grid.position.y;
+      const dest = grid.cellToWorld(this.clickedProjectCol, this.clickedProjectRow);
+      const destX = dest.x + grid.position.x;
+      const destY = dest.y + grid.position.y;
       this.createProjectPage(project, destX, destY);
     } else {
       this.createProjectPage(project);
@@ -377,8 +409,9 @@ export default class ViewManager extends Object3D {
       // Snap camera to the current project's grid cell so the reverse tunnel
       // un-center distance stays short (avoids jarring snap when the camera was
       // offset by a prior project slide).
-      const cellX = this.clickedProjectCol * grid.cellSize + grid.position.x;
-      const cellY = this.clickedProjectRow * grid.cellSize + grid.position.y;
+      const cellWorld = grid.cellToWorld(this.clickedProjectCol, this.clickedProjectRow);
+      const cellX = cellWorld.x + grid.position.x;
+      const cellY = cellWorld.y + grid.position.y;
       const dx = cellX - App.cameraRig.position.x;
       const dy = cellY - App.cameraRig.position.y;
       App.cameraRig.position.x = cellX;
@@ -581,8 +614,9 @@ export default class ViewManager extends Object3D {
     }
 
     // Snap camera to the new project's grid cell so the back transition works cleanly
-    const cellX = this.clickedProjectCol! * grid.cellSize + grid.position.x;
-    const cellY = this.clickedProjectRow! * grid.cellSize + grid.position.y;
+    const snapWorld = grid.cellToWorld(this.clickedProjectCol!, this.clickedProjectRow!);
+    const cellX = snapWorld.x + grid.position.x;
+    const cellY = snapWorld.y + grid.position.y;
     App.cameraRig.position.x = cellX;
     App.cameraRig.position.y = cellY;
 
@@ -622,8 +656,7 @@ export default class ViewManager extends Object3D {
   }
 
   private swapPrismToSquare(prismData: PrismData, grid: CategoryGridView): void {
-    const cs = grid.cellSize;
-    const square = new Wireframe(new PlaneGeometry(cs, cs), { color: grid.color });
+    const square = new Wireframe(grid.createFaceGeometry(), { color: grid.color });
 
     // Transfer thumbnail to the square
     if (prismData.thumbnailMesh?.parent === prismData.wireframe) {
@@ -707,7 +740,7 @@ export default class ViewManager extends Object3D {
 
     // Grid at origin, fully built with no animation
     gridView.position.set(0, 0, 0);
-    gridView.buildImmediate(HOME_AREA_WIDTH / GRID_COLS);
+    gridView.buildImmediate(HOME_AREA_WIDTH / GRID_COLS[area]);
     gridView.visible = true;
     gridView.enableInput();
 
@@ -740,11 +773,12 @@ export default class ViewManager extends Object3D {
     this.preProjectCameraPos = new Vector3(0, 0, App.cameraRig.position.z);
 
     // Center camera on the clicked cell (as if center-on-camera had completed)
-    App.cameraRig.position.x = col * grid.cellSize + grid.position.x;
-    App.cameraRig.position.y = row * grid.cellSize + grid.position.y;
+    const cellPos = grid.cellToWorld(col, row);
+    App.cameraRig.position.x = cellPos.x + grid.position.x;
+    App.cameraRig.position.y = cellPos.y + grid.position.y;
 
-    // Create a square at the fly-target position (top-left of screen)
-    const square = new Wireframe(new PlaneGeometry(grid.cellSize, grid.cellSize), { color: grid.color });
+    // Create a flat face at the fly-target position (top-left of screen)
+    const square = new Wireframe(grid.createFaceGeometry(), { color: grid.color });
     const flyTarget = computeFlyTarget(grid.cellSize);
     square.position.copy(flyTarget);
 
@@ -934,21 +968,37 @@ export default class ViewManager extends Object3D {
         } else if (this.activeCategory) {
           const grid = this.categoryViews.get(this.activeCategory);
           if (grid && !grid.visible) {
-            // Hide all home view objects — the grid takes over from here
-            this.homeView.visible = false;
+            const area = this.activeCategory;
+            const cellSize = HOME_AREA_WIDTH / GRID_COLS[area];
 
-            // Switch to perspective camera — the grid face is flat and coplanar,
-            // so matching the ortho view at z=0 makes the swap imperceptible.
-            App.swapToPerspective(0);
-
-            grid.showInitialFace(HOME_AREA_WIDTH / GRID_COLS);
+            grid.showInitialFace(cellSize);
             grid.visible = true;
-            // Unfold outward wave by wave; enable input when all waves complete
-            grid.startCrossUnfold(HOME_AREA_WIDTH / GRID_COLS, () => {
-              grid.enableInput();
-              this.settle();
-            });
-            this.activePlanetFocus = null;
+
+            if (area === ProjectArea.Career) {
+              // Hex: crossfade the planet out while the hex face fades in.
+              // Keep orthographic + activePlanetFocus alive during the fade so the
+              // planet stays pinned at center, then hide it and swap to perspective.
+              const planet = this.homeView.planetList.find(p => p.area === area);
+              grid.fadeInInitialFace(planet?.wireframe ?? null, () => {
+                this.homeView.visible = false;
+                this.activePlanetFocus = null;
+                App.swapToPerspective(0);
+                grid.startCrossUnfold(cellSize, () => {
+                  grid.enableInput();
+                  this.settle();
+                });
+              });
+            } else {
+              // Square: swap to perspective immediately (grid face is coplanar
+              // with the ortho view at z=0, so the swap is imperceptible).
+              App.swapToPerspective(0);
+              this.homeView.visible = false;
+              this.activePlanetFocus = null;
+              grid.startCrossUnfold(cellSize, () => {
+                grid.enableInput();
+                this.settle();
+              });
+            }
           }
         }
       }
