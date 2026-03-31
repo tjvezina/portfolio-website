@@ -54,7 +54,7 @@ export class Planet extends Object3D {
     this.text.position.copy(anchorPos);
 
     // const wasHovered = this.isHovered;
-    const isHovered = inputEnabled && App.raycaster.intersectObject(this).length > 0;
+    const isHovered = inputEnabled && App.pointerActive && App.raycaster.intersectObject(this).length > 0;
 
     this.glowStrength = Math.max(0, Math.min(1, (this.glowStrength ?? 0) + (isHovered ? 0.1 : -0.1)));
     this.wireframe.fillMaterial?.color.set(new Color(0, 0, 0).lerp(this.glowColor, this.glowStrength));
