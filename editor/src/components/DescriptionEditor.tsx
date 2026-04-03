@@ -7,7 +7,7 @@ import { Markdown } from 'tiptap-markdown';
 import { useEffect, useRef, useState } from 'react';
 
 import { importImage } from '../api';
-import { ImageGroup } from '../extensions/image-group';
+import { ImageGroup, IMAGE_DROP_META } from '../extensions/image-group';
 import './DescriptionEditor.css';
 
 interface DescriptionEditorProps {
@@ -16,6 +16,7 @@ interface DescriptionEditorProps {
   value: string;
   onChange: (markdown: string) => void;
   onBlur: () => void;
+  onSave: (markdown: string) => void;
 }
 
 export default function DescriptionEditor({
@@ -24,6 +25,7 @@ export default function DescriptionEditor({
   value,
   onChange,
   onBlur,
+  onSave,
 }: DescriptionEditorProps): React.ReactElement {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -32,8 +34,30 @@ export default function DescriptionEditor({
 
   const editor = useEditor({
     extensions: [
-      StarterKit,
-      Image.configure({ inline: false }),
+      StarterKit.configure({ dropcursor: false }),
+      Image.configure({ inline: false }).extend({
+        addStorage() {
+          return {
+            markdown: {
+              serialize(state: any, node: any, parent: any) {
+                state.write(
+                  '!['
+                  + state.esc(node.attrs.alt || '')
+                  + ']('
+                  + (node.attrs.src || '').replace(/[()]/g, '\\$&')
+                  + ')',
+                );
+                // Close the block for standalone images (not inside imageGroup)
+                // so consecutive images get a blank line separator in markdown.
+                if (parent?.type?.name !== 'imageGroup') {
+                  state.closeBlock(node);
+                }
+              },
+              parse: {},
+            },
+          };
+        },
+      }),
       ImageGroup,
       Link.configure({
         openOnClick: false,
@@ -48,6 +72,12 @@ export default function DescriptionEditor({
     content: value,
     onUpdate: ({ editor: ed }) => {
       onChange((ed.storage as Record<string, any>).markdown.getMarkdown());
+    },
+    onTransaction: ({ editor: ed, transaction }) => {
+      if (transaction.getMeta(IMAGE_DROP_META)) {
+        const md = (ed.storage as Record<string, any>).markdown.getMarkdown();
+        onSave(md);
+      }
     },
     onSelectionUpdate: ({ editor: ed }) => {
       setLinkDismissed(false);

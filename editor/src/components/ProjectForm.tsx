@@ -162,7 +162,9 @@ export default function ProjectForm({
   }
 
   function updateField<K extends keyof ProjectData>(key: K, value: ProjectData[K]): void {
-    setForm((prev) => ({ ...prev, [key]: value }));
+    const updated = { ...formRef.current, [key]: value };
+    formRef.current = updated;
+    setForm(updated);
   }
 
   function cleanForm(data: ProjectData): ProjectData {
@@ -337,6 +339,7 @@ export default function ProjectForm({
         value={form.description ?? ''}
         onChange={(md) => updateField('description', md)}
         onBlur={autoSave}
+        onSave={(md) => saveFieldNow('description', md)}
       />
 
       <div className="form-actions">
