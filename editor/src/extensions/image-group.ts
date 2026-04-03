@@ -130,6 +130,67 @@ export const ImageGroup = TiptapNode.create({
     };
   },
 
+  addNodeView() {
+    return () => {
+      const dom = document.createElement('div');
+      dom.setAttribute('data-image-group', '');
+      dom.className = 'image-group';
+
+      const contentDOM = dom;
+
+      /** Recompute image sizes so the row matches the shortest image's height. */
+      const layout = (): void => {
+        const imgs = [...dom.querySelectorAll(':scope > img')] as HTMLImageElement[];
+        if (imgs.length === 0) return;
+
+        // Reset any previous explicit sizing so naturalWidth/Height are readable
+        for (const img of imgs) {
+          img.style.width = '';
+          img.style.height = '';
+        }
+
+        // Need all images loaded to read natural dimensions
+        if (imgs.some((img) => !img.naturalWidth)) return;
+
+        const GAP = 4;
+        const aspects = imgs.map((img) => img.naturalWidth / img.naturalHeight);
+        const totalAspect = aspects.reduce((sum, a) => sum + a, 0);
+        const maxWidth = dom.clientWidth - (imgs.length - 1) * GAP;
+        const rowHeight = Math.min(
+          maxWidth / totalAspect,
+          Math.min(...imgs.map((img) => img.naturalHeight)),
+        );
+
+        for (let i = 0; i < imgs.length; i++) {
+          imgs[i].style.width = `${rowHeight * aspects[i]}px`;
+          imgs[i].style.height = `${rowHeight}px`;
+        }
+      };
+
+      // Observe child changes (images added/removed/reordered)
+      const observer = new MutationObserver(layout);
+      observer.observe(dom, { childList: true });
+
+      // Listen for image loads
+      dom.addEventListener('load', layout, true);
+
+      return {
+        dom,
+        contentDOM,
+        update(node) {
+          if (node.type.name !== 'imageGroup') return false;
+          // Let ProseMirror update the content, then relayout
+          requestAnimationFrame(layout);
+          return true;
+        },
+        destroy() {
+          observer.disconnect();
+          dom.removeEventListener('load', layout, true);
+        },
+      };
+    };
+  },
+
   addProseMirrorPlugins() {
     const indicator = document.createElement('div');
     indicator.className = 'image-drop-indicator';
