@@ -1,7 +1,13 @@
 {
   "slug": "bendy-in-nightmare-run",
   "title": "Bendy in Nightmare Run",
-  "description": "![](/assets/projects/career/bendy-in-nightmare-run/screenshot-1.png)",
+  "description": "While working at Karman Interactive, I had the great pleasure of building Bendy in Nightmare Run, an endless runner mobile game spin-off of Bendy and the Ink Machine.\n\n![](/assets/projects/career/bendy-in-nightmare-run/screenshot-1.png)\n\nThis is the most fun I've had making a game (as of 2026), as it was a small team, I was involved from start to finish, and we had a huge amount of creative freedom.\n\n![Screenshot image 9](https://play-lh.googleusercontent.com/cvZoulMxtU5q4_gE1z5AXLN2sRxcR-q10YCKvoUXrRACJg8xe3eQKQx7r3C5XoL0hDJs=w2560-h1440-rw)![Screenshot image 7](https://play-lh.googleusercontent.com/3vCs9pwXnmFNsrM0ucqfiHoFvJv5aqsL5GwvAk7WoQQip4W-5erkSk3fS9r84GIelWQ=w2560-h1440-rw)\n\nBuilding an intuitive UI and making interesting visual effects without any color was a fun challenge. Attempting to play game designer was new and uncomfortable to me, as we were left to define the mechanics and playtest them as we saw fit, but I think we ended up with a genuinely fun game!\n\n![Screenshot image 8](https://play-lh.googleusercontent.com/lWKyQ9NhwAjej3S9ez1pTTzIAHwZsx9LTrUhlQkJx356d6sPQGqg0XolobatwpzUj68=w2560-h1440-rw)![Screenshot image 10](https://play-lh.googleusercontent.com/6Sr4ne9ekU5y2S5XfpORj3mVjsLEXH3VsRGXDq_kWkQ0W23oJ-KCfJpC55qTwQdMVw=w2560-h1440-rw)\n\nThe game was still mobile freemium, but we strove to make the mechanics interesting and the in-app purchases unobtrusive.",
   "year": "2018",
+  "tags": [
+    "C#",
+    "Unity",
+    "iOS",
+    "Android"
+  ],
   "thumbnail": "assets/projects/career/bendy-in-nightmare-run/thumbnail.png"
 }

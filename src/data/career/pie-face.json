@@ -1,7 +1,13 @@
 {
   "slug": "pie-face",
   "title": "Pie Face",
-  "description": "![](/assets/projects/career/pie-face/screenshot-1.jpeg)![](/assets/projects/career/pie-face/screenshot-2.jpeg)![](/assets/projects/career/pie-face/screenshot-3.jpeg)![](/assets/projects/career/pie-face/screenshot-4.jpeg)![](/assets/projects/career/pie-face/screenshot-5.jpeg)",
+  "description": "Over the summer of 2017 I took my turn suffering at Fuel (as most Ottawa devs did in the 2010's). I basically joined as they were starting to build a mobile version of the children's board game Pie Face, took over the project, completed it, then left the company!\n\n![](/assets/projects/career/pie-face/screenshot-1.jpeg)![](/assets/projects/career/pie-face/screenshot-2.jpeg)![](/assets/projects/career/pie-face/screenshot-3.jpeg)\n\nThis game involved challenging friends to a brief minigame, after which the winner gets to throw a pie at the loser. The pies came in a wide variety of \"flavors\" and were applied to the target's profile picture as a visual effect.\n\n![](/assets/projects/career/pie-face/screenshot-4.jpeg)![](/assets/projects/career/pie-face/screenshot-5.jpeg)\n\nThe game itself was absurd and failed to become a runaway success, but it was plenty of fun to build, especially working with artists to set up a pipeline for defining new pie types that could be applied to any arbitrary profile picture (you can't tell from these screenshots, but the victim's face would actually pop out like a 3D model and animate, on top of the special effects added to them).",
   "year": "2017",
+  "tags": [
+    "C#",
+    "Unity",
+    "iOS",
+    "tvOS"
+  ],
   "thumbnail": "assets/projects/career/pie-face/thumbnail.png"
 }
