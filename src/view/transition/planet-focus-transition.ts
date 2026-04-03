@@ -1,6 +1,7 @@
 import { BufferGeometry, Mesh, Quaternion, Vector3 } from 'three';
 
 import App from '@/core/app';
+import { ProjectArea } from '@/data/types';
 import Wireframe from '@/objects/wireframe';
 import { Planet } from '@/view/home-view';
 
@@ -21,7 +22,7 @@ function getGeometry(wireframe: Wireframe): BufferGeometry | null {
  *   2. Rotates around Z so the vector from F's centroid to F's lowest edge midpoint
  *      points in the world -Y direction (upright).
  */
-export function computeFaceUpQuat(wireframe: Wireframe, currentQuat: Quaternion): Quaternion {
+function computeFaceUpQuat(wireframe: Wireframe, currentQuat: Quaternion): Quaternion {
   const geometry = getGeometry(wireframe);
   if (!geometry) return new Quaternion();
 
@@ -121,6 +122,107 @@ export function computeFaceUpQuat(wireframe: Wireframe, currentQuat: Quaternion)
   return R2.multiply(R1);
 }
 
+/**
+ * Compute a target quaternion that:
+ *   1. Aligns the vertex closest to world +Z to face +Z exactly (vertex-toward-camera,
+ *      producing a hexagonal silhouette for a cube).
+ *   2. Among that vertex's edge-connected neighbors, picks the one with the lowest
+ *      world-Y and rotates around Z so it points straight down (-Y).
+ */
+function computeVertexUpQuat(wireframe: Wireframe, currentQuat: Quaternion): Quaternion {
+  const geometry = getGeometry(wireframe);
+  if (!geometry) return new Quaternion();
+
+  const positions = geometry.getAttribute('position');
+  const index = geometry.getIndex();
+
+  // Deduplicate vertices by position (BoxGeometry has 24 buffer vertices for 8 corners)
+  const vertices: Vector3[] = [];
+  const vertexMap = new Map<string, number>();
+  const bufferToUnique = new Int32Array(positions.count);
+  const v = new Vector3();
+
+  for (let i = 0; i < positions.count; i++) {
+    v.fromBufferAttribute(positions, i);
+    const key = `${v.x.toFixed(4)},${v.y.toFixed(4)},${v.z.toFixed(4)}`;
+    let ui = vertexMap.get(key);
+    if (ui === undefined) {
+      ui = vertices.length;
+      vertexMap.set(key, ui);
+      vertices.push(v.clone());
+    }
+    bufferToUnique[i] = ui;
+  }
+
+  // Find the vertex whose world-space direction is closest to +Z
+  const worldZ = new Vector3(0, 0, 1);
+  let bestIdx = 0;
+  let bestDot = -Infinity;
+  for (let i = 0; i < vertices.length; i++) {
+    const dot = vertices[i].clone().applyQuaternion(currentQuat).normalize().dot(worldZ);
+    if (dot > bestDot) { bestDot = dot; bestIdx = i; }
+  }
+
+  // R1: rotate chosen vertex direction → +Z
+  const vertexDir = vertices[bestIdx].clone().normalize();
+  const R1 = new Quaternion().setFromUnitVectors(vertexDir, worldZ);
+
+  // Build triangle adjacency for the chosen vertex
+  const triCount = index ? index.count / 3 : positions.count / 3;
+  const adjacent = new Set<number>();
+  for (let i = 0; i < triCount; i++) {
+    const i0 = bufferToUnique[index ? index.getX(i * 3) : i * 3];
+    const i1 = bufferToUnique[index ? index.getX(i * 3 + 1) : i * 3 + 1];
+    const i2 = bufferToUnique[index ? index.getX(i * 3 + 2) : i * 3 + 2];
+    if (i0 === bestIdx) { adjacent.add(i1); adjacent.add(i2); }
+    if (i1 === bestIdx) { adjacent.add(i0); adjacent.add(i2); }
+    if (i2 === bestIdx) { adjacent.add(i0); adjacent.add(i1); }
+  }
+
+  // Filter to true edge neighbors (shortest distance only — excludes face diagonals)
+  const chosenPos = vertices[bestIdx];
+  let shortestDist = Infinity;
+  for (const ni of adjacent) {
+    const d = vertices[ni].distanceTo(chosenPos);
+    if (d < shortestDist - 0.001) shortestDist = d;
+  }
+  const neighbors: number[] = [];
+  for (const ni of adjacent) {
+    if (vertices[ni].distanceTo(chosenPos) < shortestDist + 0.001) {
+      neighbors.push(ni);
+    }
+  }
+
+  // After R1, find the neighbor with the lowest Y
+  let lowestIdx = -1;
+  let lowestY = Infinity;
+  for (const ni of neighbors) {
+    const y = vertices[ni].clone().applyQuaternion(R1).y;
+    if (y < lowestY) { lowestY = y; lowestIdx = ni; }
+  }
+  if (lowestIdx === -1) return R1;
+
+  // R2: rotate around Z so that neighbor points toward -Y
+  const neighborXY = vertices[lowestIdx].clone().applyQuaternion(R1).setZ(0).normalize();
+  const R2 = new Quaternion().setFromUnitVectors(neighborXY, new Vector3(0, -1, 0));
+
+  return R2.multiply(R1);
+}
+
+/**
+ * Pick the appropriate target-orientation function for a given planet.
+ * Cube → vertex-toward-camera (hexagonal silhouette).
+ * Others → face-toward-camera (current default).
+ */
+export function computeTargetQuat(
+  wireframe: Wireframe, currentQuat: Quaternion, area: ProjectArea,
+): Quaternion {
+  if (area === ProjectArea.College) {
+    return computeVertexUpQuat(wireframe, currentQuat);
+  }
+  return computeFaceUpQuat(wireframe, currentQuat);
+}
+
 /** Z offset for shrinking elements to prevent clipping with the selected planet. */
 const SHRINK_Z = -5;
 
@@ -195,7 +297,7 @@ export default class PlanetFocusTransition {
       this.selectedStartScale = 1;
       this.selectedTargetScale = targetScale;
       this.selectedStartQuat = selectedPlanet.wireframe.quaternion.clone();
-      this.selectedTargetQuat = computeFaceUpQuat(selectedPlanet.wireframe, this.selectedStartQuat);
+      this.selectedTargetQuat = computeTargetQuat(selectedPlanet.wireframe, this.selectedStartQuat, selectedPlanet.area);
       this.otherStartPositions = otherPlanets.map(p => p.wireframe.position.clone());
       this.otherTargetPositions = otherPlanets.map(() => new Vector3(0, 0, SHRINK_Z));
       this.otherStartScale = 1;
