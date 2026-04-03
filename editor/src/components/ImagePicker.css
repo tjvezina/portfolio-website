@@ -17,5 +17,5 @@
 }
 
 .image-preview.clickable:hover {
-  border-color: #5a9a5a;
+  border-color: var(--accent-dim);
 }

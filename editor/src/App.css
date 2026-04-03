@@ -13,6 +13,24 @@ body {
   min-height: 100vh;
 }
 
+:root:has(.accent-college) {
+  --accent: #f28955;
+  --accent-dim: #c47045;
+  --accent-dark: #a35e3a;
+}
+
+:root:has(.accent-personal) {
+  --accent: #55f255;
+  --accent-dim: #45c245;
+  --accent-dark: #38a038;
+}
+
+:root:has(.accent-career) {
+  --accent: #55ddf2;
+  --accent-dim: #45b5c5;
+  --accent-dark: #3896a4;
+}
+
 .app {
   display: flex;
   flex-direction: column;
@@ -27,7 +45,7 @@ body {
 
 .app-header h1 {
   font-size: 1.2rem;
-  color: #6aaa6a;
+  color: #d455d4;
 }
 
 .app-body {

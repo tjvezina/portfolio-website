@@ -9,7 +9,7 @@
 
 .thumbnail-editor h2 {
   font-size: 1.1rem;
-  color: #6aaa6a;
+  color: var(--accent);
   margin-bottom: 4px;
 }
 
@@ -44,5 +44,5 @@
 
 .zoom-control input[type="range"] {
   flex: 1;
-  accent-color: #5a9a5a;
+  accent-color: var(--accent-dim);
 }

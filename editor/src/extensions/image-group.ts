@@ -123,7 +123,7 @@ export const ImageGroup = TiptapNode.create({
     indicator.className = 'image-drop-indicator';
     indicator.style.cssText =
       'position:fixed;pointer-events:none;z-index:9999;'
-      + 'background:#5a9a5a;border-radius:2px;display:none;';
+      + 'background:var(--accent-dim);border-radius:2px;display:none;';
 
     /** Reference to the editor content wrapper for toggling dropcursor suppression. */
     let editorContentEl: Element | null = null;

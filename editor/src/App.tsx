@@ -41,7 +41,7 @@ export default function App(): React.ReactElement {
     ?.projects.find((p) => p.slug === selection.slug);
 
   return (
-    <div className="app">
+    <div className={`app accent-${selection.category}`}>
       <header className="app-header">
         <h1>Portfolio Editor</h1>
       </header>
