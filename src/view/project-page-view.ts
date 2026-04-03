@@ -221,7 +221,7 @@ export default class ProjectPageView extends Object3D {
     }
 
     // Content below the header row (thumbnail + right-side info)
-    let y = Math.min(thumbBottom, rightY) - SECTION_GAP;
+    let y = Math.min(thumbBottom, rightY);
     const descLeft = -contentHalfWidth + margin;
     const descWidth = HOME_AREA_WIDTH - margin * 2;
 
@@ -318,7 +318,7 @@ export default class ProjectPageView extends Object3D {
         );
       }
       ac.container.position.y = ac.baseY +
-        Math.sin(time * 6 - ac.index * 0.3) * 0.012;
+        Math.sin(time * 6 - ac.index * 0.6) * 0.012;
     }
 
     // Button hover/press
