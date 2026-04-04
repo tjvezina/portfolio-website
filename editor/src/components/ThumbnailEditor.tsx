@@ -66,7 +66,7 @@ export default function ThumbnailEditor({
       <div className="thumbnail-editor" onClick={(e) => e.stopPropagation()}>
         <h2>Crop Thumbnail</h2>
         <p className="thumbnail-editor-hint">
-          Drag to pan, scroll to zoom. Result will be {OUTPUT_SIZE}&times;{OUTPUT_SIZE}px.
+          Drag to pan, scroll to zoom. Displayed as a hexagon ({OUTPUT_SIZE}&times;{OUTPUT_SIZE}px).
         </p>
         <div className="crop-container">
           <Cropper
@@ -74,6 +74,7 @@ export default function ThumbnailEditor({
             crop={crop}
             zoom={zoom}
             aspect={1}
+            showGrid={false}
             onCropChange={setCrop}
             onZoomChange={setZoom}
             onCropComplete={onCropComplete}
