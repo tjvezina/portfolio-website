@@ -51,7 +51,7 @@ export default class BackButton extends Object3D {
   constructor() {
     super();
 
-    const size = TEXT_SIZE * App.pixelRatio;
+    const size = TEXT_SIZE;
     const textWidth = measureTextWidth(LABEL, size);
     this.buttonWidth = textWidth + PADDING_X * 2;
     this.buttonHeight = size + PADDING_Y * 2;

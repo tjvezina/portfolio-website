@@ -36,11 +36,11 @@ export default class MainScene extends Scene {
     const bloomEffect = new BloomEffect({
       mipmapBlur: true,
       luminanceThreshold: 0,
-      intensity: (window.devicePixelRatio === 1 ? 5 : 5),
+      intensity: 5,
     });
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore : Type definitions are incomplete
-    bloomEffect.mipmapBlurPass.radius = 0.2;
+    bloomEffect.mipmapBlurPass.radius = 0.15 * App.pixelRatio;
     const effectPass = new EffectPass(App.activeCamera, bloomEffect);
     effectPass.fullscreenMaterial.transparent = true;
     effectPass.fullscreenMaterial.blending = AdditiveBlending;
@@ -50,7 +50,7 @@ export default class MainScene extends Scene {
     this.viewManager = new ViewManager();
     this.add(this.viewManager);
 
-    this.titleText = new Text('Tyler J Vezina'.toUpperCase(), App.synthaFont, { color: NeonColor.Pink, size: 0.16 * App.pixelRatio, alignX: TextAlignX.Left, alignY: TextAlignY.Top });
+    this.titleText = new Text('Tyler J Vezina'.toUpperCase(), App.synthaFont, { color: NeonColor.Pink, size: 0.16, alignX: TextAlignX.Left, alignY: TextAlignY.Top });
     this.titleText.position.x = -5*Math.max(1, App.width/App.height) + 0.3;
     this.titleText.position.y = 5*Math.max(1, App.height/App.width) - 0.3;
     this.titleText.position.z = 5;
