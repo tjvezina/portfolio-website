@@ -131,7 +131,9 @@ export default class App {
 
     this._activeCamera = this.orthoCamera;
 
-    this.effectComposer = new EffectComposer(this.renderer);
+    this.effectComposer = new EffectComposer(this.renderer, {
+      multisampling: Math.min(4, this.renderer.capabilities.maxSamples),
+    });
     this.renderPass = new RenderPass(this.scene, this._activeCamera);
     this.effectComposer.addPass(this.renderPass);
 
