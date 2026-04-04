@@ -255,6 +255,56 @@ export default function editorApiPlugin(): Plugin {
           return sendJson(res, 200, { path: relativePath });
         }
 
+        // POST /api/images/import-url
+        if (req.method === 'POST' && url === '/api/images/import-url') {
+          let body: { category: string; slug: string; url: string };
+          try { body = JSON.parse(await parseBody(req)); }
+          catch { return sendError(res, 400, 'Invalid JSON body'); }
+
+          const { category: cat, slug: s, url: imageUrl } = body;
+          if (!cat || !s || !imageUrl) {
+            return sendError(res, 400, 'category, slug, and url are required');
+          }
+          if (!CATEGORIES.includes(cat as typeof CATEGORIES[number])) {
+            return sendError(res, 400, `Invalid category: ${cat}`);
+          }
+          if (!/^https?:\/\//.test(imageUrl)) {
+            return sendError(res, 400, 'url must be an HTTP(S) URL');
+          }
+
+          let fetchRes: Response;
+          try { fetchRes = await fetch(imageUrl); }
+          catch { return sendError(res, 502, 'Failed to fetch image'); }
+          if (!fetchRes.ok) {
+            return sendError(res, 502, `Failed to download image: ${fetchRes.status}`);
+          }
+
+          const ct = (fetchRes.headers.get('content-type') ?? '').split(';')[0].trim();
+          const extMap: Record<string, string> = {
+            'image/png': '.png',
+            'image/jpeg': '.jpg',
+            'image/gif': '.gif',
+            'image/webp': '.webp',
+          };
+          const ext = extMap[ct] ?? '.png';
+
+          const buffer = Buffer.from(await fetchRes.arrayBuffer());
+          const assetDir = path.join(ASSETS_DIR, 'projects', cat, s);
+          fs.mkdirSync(assetDir, { recursive: true });
+
+          const existing = fs.readdirSync(assetDir).filter((f) => f.startsWith('screenshot-'));
+          const numbers = existing
+            .map((f) => parseInt(f.match(/screenshot-(\d+)/)?.[1] ?? '0', 10))
+            .filter((n) => !isNaN(n));
+          const next = numbers.length > 0 ? Math.max(...numbers) + 1 : 1;
+          const filename = `screenshot-${next}${ext}`;
+
+          const destPath = path.join(assetDir, filename);
+          fs.writeFileSync(destPath, new Uint8Array(buffer));
+          const relativePath = `assets/projects/${cat}/${s}/${filename}`;
+          return sendJson(res, 200, { path: relativePath });
+        }
+
         // Route matching for /api/categories/:category/projects[/:slug]
         const projectMatch = url.match(
           /^\/api\/categories\/(college|personal|career)\/projects(?:\/([a-z0-9-]+))?$/,

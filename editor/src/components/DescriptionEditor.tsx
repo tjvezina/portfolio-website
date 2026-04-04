@@ -1,12 +1,12 @@
 import Image from '@tiptap/extension-image';
 import Link from '@tiptap/extension-link';
-import { EditorContent, useEditor } from '@tiptap/react';
+import { Editor, EditorContent, useEditor } from '@tiptap/react';
 import { BubbleMenu } from '@tiptap/react/menus';
 import StarterKit from '@tiptap/starter-kit';
 import { Markdown } from 'tiptap-markdown';
 import { useEffect, useRef, useState } from 'react';
 
-import { importImage } from '../api';
+import { importImage, importImageFromUrl } from '../api';
 import { ImageGroup, IMAGE_DROP_META } from '../extensions/image-group';
 import './DescriptionEditor.css';
 
@@ -28,9 +28,48 @@ export default function DescriptionEditor({
   onSave,
 }: DescriptionEditorProps): React.ReactElement {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const downloadingUrls = useRef(new Set<string>());
 
   const [linkUrl, setLinkUrl] = useState('');
   const [linkDismissed, setLinkDismissed] = useState(false);
+
+  function processExternalImages(ed: Editor): void {
+    if (!slug) return;
+    const toDownload: string[] = [];
+    ed.state.doc.descendants((node) => {
+      if (node.type.name === 'image') {
+        const src = node.attrs.src as string;
+        if (/^https?:\/\//.test(src) && !downloadingUrls.current.has(src)) {
+          toDownload.push(src);
+        }
+      }
+    });
+    for (const src of toDownload) {
+      downloadingUrls.current.add(src);
+      importImageFromUrl(category, slug, src)
+        .then((localPath) => {
+          const { state } = ed;
+          const tr = state.tr;
+          let modified = false;
+          state.doc.descendants((node, pos) => {
+            if (node.type.name === 'image' && node.attrs.src === src) {
+              tr.setNodeMarkup(pos, undefined, { ...node.attrs, src: `/${localPath}` });
+              modified = true;
+            }
+          });
+          if (modified) {
+            tr.setMeta(IMAGE_DROP_META, true);
+            ed.view.dispatch(tr);
+          }
+        })
+        .catch((err) => {
+          console.error(`Failed to download image: ${src}`, err);
+        })
+        .finally(() => {
+          downloadingUrls.current.delete(src);
+        });
+    }
+  }
 
   const editor = useEditor({
     extensions: [
@@ -72,6 +111,7 @@ export default function DescriptionEditor({
     content: value,
     onUpdate: ({ editor: ed }) => {
       onChange((ed.storage as Record<string, any>).markdown.getMarkdown());
+      processExternalImages(ed);
     },
     onTransaction: ({ editor: ed, transaction }) => {
       if (transaction.getMeta(IMAGE_DROP_META)) {

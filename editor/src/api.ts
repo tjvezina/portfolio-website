@@ -96,3 +96,21 @@ export async function importImage(
   const data = await res.json();
   return data.path;
 }
+
+export async function importImageFromUrl(
+  category: string,
+  slug: string,
+  url: string,
+): Promise<string> {
+  const res = await fetch('/api/images/import-url', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ category, slug, url }),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error ?? res.statusText);
+  }
+  const data = await res.json();
+  return data.path;
+}
