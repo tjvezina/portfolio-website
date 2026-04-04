@@ -21,13 +21,17 @@ export default function ImagePicker({
 }: ImagePickerProps): React.ReactElement {
   const inputRef = useRef<HTMLInputElement>(null);
   const [editingUrl, setEditingUrl] = useState<string | null>(null);
+  const [editingLossless, setEditingLossless] = useState(false);
   const [cacheBust, setCacheBust] = useState('');
+
+  const LOSSLESS_TYPES = new Set(['image/png', 'image/gif', 'image/tiff', 'image/bmp']);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>): void {
     const files = Array.from(e.target.files ?? []);
     if (files.length === 0) return;
-    const url = URL.createObjectURL(files[0]);
-    setEditingUrl(url);
+    const file = files[0];
+    setEditingUrl(URL.createObjectURL(file));
+    setEditingLossless(LOSSLESS_TYPES.has(file.type));
     if (inputRef.current) inputRef.current.value = '';
   }
 
@@ -35,7 +39,8 @@ export default function ImagePicker({
     if (editingUrl) URL.revokeObjectURL(editingUrl);
     setEditingUrl(null);
     try {
-      const file = new File([blob], 'thumbnail.png', { type: 'image/png' });
+      const ext = blob.type === 'image/png' ? 'png' : 'webp';
+      const file = new File([blob], `thumbnail.${ext}`, { type: blob.type });
       const path = await importImage(category, slug, 'thumbnail', file);
       setCacheBust(`?t=${Date.now()}`);
       onImported(path);
@@ -68,6 +73,7 @@ export default function ImagePicker({
       {editingUrl && (
         <ThumbnailEditor
           imageUrl={editingUrl}
+          lossless={editingLossless}
           onConfirm={handleCropConfirm}
           onCancel={handleCropCancel}
         />

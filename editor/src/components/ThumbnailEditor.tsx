@@ -4,30 +4,33 @@ import type { Area } from 'react-easy-crop';
 
 import './ThumbnailEditor.css';
 
-const OUTPUT_SIZE = 128;
+const OUTPUT_SIZE = 256;
 
 interface ThumbnailEditorProps {
   imageUrl: string;
+  lossless: boolean;
   onConfirm: (blob: Blob) => void;
   onCancel: () => void;
 }
 
-function cropImage(imageSrc: string, crop: Area): Promise<Blob> {
+function cropImage(imageSrc: string, crop: Area, lossless: boolean): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = (): void => {
       const canvas = document.createElement('canvas');
-      canvas.width = OUTPUT_SIZE;
-      canvas.height = OUTPUT_SIZE;
+      const size = Math.min(crop.width, OUTPUT_SIZE);
+      canvas.width = size;
+      canvas.height = size;
       const ctx = canvas.getContext('2d')!;
       ctx.drawImage(
         img,
         crop.x, crop.y, crop.width, crop.height,
-        0, 0, OUTPUT_SIZE, OUTPUT_SIZE,
+        0, 0, size, size,
       );
       canvas.toBlob(
         (blob) => blob ? resolve(blob) : reject(new Error('Canvas toBlob failed')),
-        'image/png',
+        lossless ? 'image/png' : 'image/webp',
+        lossless ? undefined : 0.95,
       );
     };
     img.onerror = (): void => reject(new Error('Failed to load image'));
@@ -37,6 +40,7 @@ function cropImage(imageSrc: string, crop: Area): Promise<Blob> {
 
 export default function ThumbnailEditor({
   imageUrl,
+  lossless,
   onConfirm,
   onCancel,
 }: ThumbnailEditorProps): React.ReactElement {
@@ -53,7 +57,7 @@ export default function ThumbnailEditor({
     if (!croppedArea) return;
     setSaving(true);
     try {
-      const blob = await cropImage(imageUrl, croppedArea);
+      const blob = await cropImage(imageUrl, croppedArea, lossless);
       onConfirm(blob);
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Crop failed');
