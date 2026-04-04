@@ -1,7 +1,7 @@
 import { BufferGeometry, EdgesGeometry, Mesh, MeshBasicMaterial, Vector2 } from 'three';
 import { Wireframe as threejsWireframe } from 'three/addons/lines/Wireframe';
-import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial';
-import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry';
+import { LineMaterial } from 'three/addons/lines/LineMaterial';
+import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry';
 
 import App from '@/core/app';
 import { BLOOM_LAYER } from '@/core/layers';

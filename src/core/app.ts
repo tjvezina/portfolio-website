@@ -1,8 +1,8 @@
 import { EffectComposer, EffectPass, RenderPass } from 'postprocessing';
-import { Camera, Clock, Mesh, Object3D, OrthographicCamera, PerspectiveCamera, Raycaster, Vector2, WebGLRenderer } from 'three';
-import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial';
-import { Font, FontLoader } from 'three/examples/jsm/loaders/FontLoader';
-import { TTFLoader } from 'three/examples/jsm/loaders/TTFLoader';
+import { Camera, Mesh, Object3D, OrthographicCamera, PerspectiveCamera, Raycaster, Timer, Vector2, WebGLRenderer } from 'three';
+import { LineMaterial } from 'three/addons/lines/LineMaterial';
+import { Font, FontLoader } from 'three/addons/loaders/FontLoader';
+import { TTFLoader } from 'three/addons/loaders/TTFLoader';
 
 import { BLOOM_LAYER } from '@/core/layers';
 import Router, { NavigationDirection, Route } from '@/core/router';
@@ -29,7 +29,7 @@ export default class App {
   static get effectPass(): EffectPass | null { return App.#instance.effectPass; }
   static set effectPass(pass: EffectPass | null) { App.#instance.effectPass = pass; }
 
-  static get clock(): Clock { return App.#instance.clock; }
+  static get timer(): Timer { return App.#instance.timer; }
   static get deltaTime(): number { return App.#instance.deltaTime; }
 
   static get raycaster(): Raycaster { return App.#instance.raycaster; }
@@ -94,7 +94,7 @@ export default class App {
   renderer: WebGLRenderer;
   effectComposer: EffectComposer;
 
-  clock = new Clock();
+  timer = new Timer();
   deltaTime = 0;
 
   raycaster = new Raycaster();
@@ -230,7 +230,8 @@ export default class App {
     requestAnimationFrame(this.draw.bind(this));
 
     this.raycaster.setFromCamera(this.pointer, App.activeCamera);
-    this.deltaTime = this.clock.getDelta();
+    this.timer.update();
+    this.deltaTime = this.timer.getDelta();
 
     this.scene.update();
 

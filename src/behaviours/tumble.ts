@@ -126,7 +126,7 @@ export class Tumble extends Behaviour {
     if (speed <= 0) return;
 
     // Organic wobble signal (sum of incommensurate sines)
-    const wobbleT = App.clock.elapsedTime * this.config.wobbleSpeed;
+    const wobbleT = App.timer.getElapsed() * this.config.wobbleSpeed;
     const wiggle = (Math.sin(1.1 * wobbleT) + Math.sin(3.4 * wobbleT) + Math.sin(6.7 * wobbleT)) / 3;
 
     // Drift the internal reference frame

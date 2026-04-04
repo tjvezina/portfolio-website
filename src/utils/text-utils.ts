@@ -1,5 +1,5 @@
 import { Shape } from 'three';
-import { Font } from 'three/examples/jsm/loaders/FontLoader';
+import { Font } from 'three/addons/loaders/FontLoader';
 import { ShapePath } from 'three/src/extras/core/ShapePath';
 
 import App from '@/core/app';

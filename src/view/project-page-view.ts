@@ -294,7 +294,7 @@ export default class ProjectPageView extends Object3D {
 
   update(): void {
     // Animate bold characters: rainbow hue cycle + sine wave bounce
-    const time = App.clock.elapsedTime;
+    const time = App.timer.getElapsed();
     for (const ac of this.animatedChars) {
       // OKLCH hue cycling: perceptually uniform brightness and saturation
       const h = -(time * 0.6 - ac.index * 0.1) * Math.PI * 2;

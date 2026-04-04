@@ -66,7 +66,7 @@ export default class ShatterIcosa extends Object3D {
   }
 
   update(): void {
-    const t = Math.max(0, -Math.cos(App.clock.elapsedTime));
+    const t = Math.max(0, -Math.cos(App.timer.getElapsed()));
 
     this.children.forEach(shard => {
       const mesh = shard.children[0];

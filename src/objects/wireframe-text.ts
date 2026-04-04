@@ -1,6 +1,6 @@
 import { Object3D, ShapeGeometry, Vector3 } from 'three';
 import { Font } from 'three/addons/loaders/FontLoader';
-import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry';
+import { TextGeometry } from 'three/addons/geometries/TextGeometry';
 
 import { TextAlignX, TextAlignY, TextOptions } from '@/objects/text';
 import Wireframe, { WireframeOptions } from '@/objects/wireframe';
@@ -18,7 +18,7 @@ export default class WireframeText extends Object3D {
     const textGeometry = new TextGeometry(text, {
       font,
       size: options?.size ?? 1,
-      height: 0,
+      depth: 0,
       curveSegments: 1,
     });
 

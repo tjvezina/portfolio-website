@@ -130,7 +130,7 @@ export default class StarField extends Points {
     const colAttr = this.geometry.getAttribute('color') as BufferAttribute;
     const positions = posAttr.array as Float32Array;
     const colors = colAttr.array as Float32Array;
-    const time = App.clock.elapsedTime;
+    const time = App.timer.getElapsed();
     const count = posAttr.count;
 
     const scrollSpeed = 0.2;
