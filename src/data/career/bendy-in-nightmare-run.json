@@ -1,7 +1,7 @@
 {
   "slug": "bendy-in-nightmare-run",
   "title": "Bendy in Nightmare Run",
-  "description": "While working at Karman Interactive, I had the great pleasure of building Bendy in Nightmare Run, an endless runner mobile game spin-off of Bendy and the Ink Machine.\n\n![](/assets/projects/career/bendy-in-nightmare-run/screenshot-1.png)\n\nThis is the most fun I've had making a game (as of 2026), as it was a small team, I was involved from start to finish, and we had a huge amount of creative freedom.\n\n![Screenshot image 9](assets/projects/career/bendy-in-nightmare-run/screenshot-2.webp)![Screenshot image 7](assets/projects/career/bendy-in-nightmare-run/screenshot-3.webp)\n\nBuilding an intuitive UI and making interesting visual effects without any color was a fun challenge. Attempting to play game designer was new and uncomfortable to me, as we were left to define the mechanics and playtest them as we saw fit, but I think we ended up with a genuinely fun game!\n\n![Screenshot image 8](assets/projects/career/bendy-in-nightmare-run/screenshot-4.webp)![Screenshot image 10](assets/projects/career/bendy-in-nightmare-run/screenshot-5.webp)\n\nThe game was still mobile freemium, but we strove to make the mechanics interesting and the in-app purchases unobtrusive.",
+  "description": "While working at Karman Interactive, I had the great pleasure of building Bendy in Nightmare Run, an endless runner mobile game spin-off of Bendy and the Ink Machine.\n\n![](/assets/projects/career/bendy-in-nightmare-run/screenshot-1.webp)\n\nThis is the most fun I've had making a game (as of 2026), as it was a small team, I was involved from start to finish, and we had a huge amount of creative freedom.\n\n![Screenshot image 9](assets/projects/career/bendy-in-nightmare-run/screenshot-2.webp)![Screenshot image 7](assets/projects/career/bendy-in-nightmare-run/screenshot-3.webp)\n\nBuilding an intuitive UI and making interesting visual effects without any color was a fun challenge. Attempting to play game designer was new and uncomfortable to me, as we were left to define the mechanics and playtest them as we saw fit, but I think we ended up with a genuinely fun game!\n\n![Screenshot image 8](assets/projects/career/bendy-in-nightmare-run/screenshot-4.webp)![Screenshot image 10](assets/projects/career/bendy-in-nightmare-run/screenshot-5.webp)\n\nThe game was still mobile freemium, but we strove to make the mechanics interesting and the in-app purchases unobtrusive.",
   "year": "2018",
   "tags": [
     "C#",
@@ -9,5 +9,5 @@
     "iOS",
     "Android"
   ],
-  "thumbnail": "assets/projects/career/bendy-in-nightmare-run/thumbnail.png"
+  "thumbnail": "assets/projects/career/bendy-in-nightmare-run/thumbnail.webp"
 }

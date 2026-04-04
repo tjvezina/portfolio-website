@@ -1,11 +1,11 @@
 {
   "slug": "retro-future",
   "title": "Retro Future",
-  "description": "My team's third-year final project was an overly-ambitious multiplayer first-person shooter called Retro Future. I don't have the source code any more, but I do still have this massive **poster** that was printed for us!\n\n![](/assets/projects/college/retro-future/screenshot-2.jpg)You can see the tower I modelled as our only level, and we had begun to use Unity networking to build multiplayer sessions, but unsurprisingly we did not come anywhere near a finished FPS!",
+  "description": "My team's third-year final project was an overly-ambitious multiplayer first-person shooter called Retro Future. I don't have the source code any more, but I do still have this massive **poster** that was printed for us!\n\n![](/assets/projects/college/retro-future/screenshot-2.webp)You can see the tower I modelled as our only level, and we had begun to use Unity networking to build multiplayer sessions, but unsurprisingly we did not come anywhere near a finished FPS!",
   "year": "2012-2013",
   "tags": [
     "C#",
     "Unity"
   ],
-  "thumbnail": "assets/projects/college/retro-future/thumbnail.png"
+  "thumbnail": "assets/projects/college/retro-future/thumbnail.webp"
 }

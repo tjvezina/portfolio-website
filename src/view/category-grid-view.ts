@@ -647,7 +647,7 @@ export default class CategoryGridView extends Object3D {
 
     if (project) {
       // Thumbnail texture on front face (starts invisible, fades in when loaded)
-      const thumbnailSrc = project.thumbnail ?? '/assets/default-thumbnail.png';
+      const thumbnailSrc = project.thumbnail ?? '/assets/default-thumbnail.webp';
       const thumbnailGeo = createHexFaceGeometry(this.hexR);
       const thumbnailMat = new MeshBasicMaterial({ transparent: true, opacity: 0 });
       const thumbnailMesh = new Mesh(thumbnailGeo, thumbnailMat);

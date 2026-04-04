@@ -1,7 +1,7 @@
 {
   "slug": "weirdwood-manor-2",
   "title": "Weirdwood Manor 2",
-  "description": "I spent over a year at Relish (<https://reli.sh/games/>) working on both the sequel to their storybook mobile game, Weirdwood Manor 2, and the engine beneath it with the dream of building more storybook games even faster in the future.\n\n![](/assets/projects/career/weirdwood-manor-2/screenshot-4.png)\n\nThe first phase of the project for me was graphics research—I was tasked with improving visual quality while maintaining performance on mobile devices. I ended up writing custom skin shaders with subsurface scattering so they would look less plasticy, and special effects like the ghost shader you see below.\n\n![](/assets/projects/career/weirdwood-manor-2/screenshot-3.png)\n\nThe project itself was fun to build, but poorly managed and wildly off schedule, so in the end we didn't come close to the storybook engine we dreamed of, and Weirdwood Manor 2 wasn't published until three years after I left.\n\n![](/assets/projects/career/weirdwood-manor-2/screenshot-2.png)",
+  "description": "I spent over a year at Relish (<https://reli.sh/games/>) working on both the sequel to their storybook mobile game, Weirdwood Manor 2, and the engine beneath it with the dream of building more storybook games even faster in the future.\n\n![](/assets/projects/career/weirdwood-manor-2/screenshot-4.webp)\n\nThe first phase of the project for me was graphics research—I was tasked with improving visual quality while maintaining performance on mobile devices. I ended up writing custom skin shaders with subsurface scattering so they would look less plasticy, and special effects like the ghost shader you see below.\n\n![](/assets/projects/career/weirdwood-manor-2/screenshot-3.webp)\n\nThe project itself was fun to build, but poorly managed and wildly off schedule, so in the end we didn't come close to the storybook engine we dreamed of, and Weirdwood Manor 2 wasn't published until three years after I left.\n\n![](/assets/projects/career/weirdwood-manor-2/screenshot-2.webp)",
   "year": "2020",
   "tags": [
     "C#",
@@ -9,5 +9,5 @@
     "iOS",
     "Android"
   ],
-  "thumbnail": "assets/projects/career/weirdwood-manor-2/thumbnail.png"
+  "thumbnail": "assets/projects/career/weirdwood-manor-2/thumbnail.webp"
 }

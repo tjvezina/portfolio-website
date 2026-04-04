@@ -1,7 +1,7 @@
 {
   "slug": "optical-intrusion",
   "title": "Optical Intrusion",
-  "description": "We had a class on iOS development, in which I created this wave-based eyeball-themed shooter.\n\n![](assets/projects/college/optical-intrusion/screenshot-1.jpg)In 2022, I ported the project to web with **p5.js**, with minimal changes to support mouse controls instead of touch, to keep it alive and playable longer.",
+  "description": "We had a class on iOS development, in which I created this wave-based eyeball-themed shooter.\n\n![](assets/projects/college/optical-intrusion/screenshot-1.webp)In 2022, I ported the project to web with **p5.js**, with minimal changes to support mouse controls instead of touch, to keep it alive and playable longer.",
   "year": "2011",
   "tags": [
     "C++",
@@ -14,5 +14,5 @@
       "url": "https://tjvezina.github.io/optical-intrusion-js"
     }
   ],
-  "thumbnail": "assets/projects/college/optical-intrusion/thumbnail.jpg"
+  "thumbnail": "assets/projects/college/optical-intrusion/thumbnail.webp"
 }

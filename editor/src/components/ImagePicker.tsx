@@ -11,7 +11,7 @@ interface ImagePickerProps {
   onImported: (path: string) => void;
 }
 
-const PLACEHOLDER = '/default-thumbnail.png';
+const PLACEHOLDER = '/default-thumbnail.webp';
 
 export default function ImagePicker({
   category,

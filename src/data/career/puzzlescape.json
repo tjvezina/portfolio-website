@@ -1,7 +1,7 @@
 {
   "slug": "puzzlescape",
   "title": "Puzzlescape",
-  "description": "I started at Magmic in 2013, working for a while on small tasks like game updates and fixes. In 2014, our team Deep Thought had formed and we built Puzzlescape, a freemium mobile game version of those puzzle books with crosswords, sudokus, wordsearches, etc.\n\n![](/assets/projects/career/puzzlescape/screenshot-17.jpeg)![](/assets/projects/career/puzzlescape/screenshot-18.jpeg)\n\nThis was a lot of fun to build, I remember working on the crossword solver and making it as easy and intuitive as possible. Of course, after we built the fun part, we were forced to add all the freemium features no one likes, like limit ink and in-app purchases that let you keep playing!\n\n![](/assets/projects/career/puzzlescape/screenshot-19.jpeg)![](/assets/projects/career/puzzlescape/screenshot-20.jpeg)\n\nAnd of course, at the last minute before the app was published (and failed), they changed the name to DAILY PUZZLES.",
+  "description": "I started at Magmic in 2013, working for a while on small tasks like game updates and fixes. In 2014, our team Deep Thought had formed and we built Puzzlescape, a freemium mobile game version of those puzzle books with crosswords, sudokus, wordsearches, etc.\n\n![](/assets/projects/career/puzzlescape/screenshot-17.webp)![](/assets/projects/career/puzzlescape/screenshot-18.webp)\n\nThis was a lot of fun to build, I remember working on the crossword solver and making it as easy and intuitive as possible. Of course, after we built the fun part, we were forced to add all the freemium features no one likes, like limit ink and in-app purchases that let you keep playing!\n\n![](/assets/projects/career/puzzlescape/screenshot-19.webp)![](/assets/projects/career/puzzlescape/screenshot-20.webp)\n\nAnd of course, at the last minute before the app was published (and failed), they changed the name to DAILY PUZZLES.",
   "year": "2014",
   "tags": [
     "C#",
@@ -9,5 +9,5 @@
     "iOS",
     "Android"
   ],
-  "thumbnail": "assets/projects/career/puzzlescape/thumbnail.png"
+  "thumbnail": "assets/projects/career/puzzlescape/thumbnail.webp"
 }
