@@ -1,7 +1,17 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import sharp from 'sharp';
 import type { Plugin, ViteDevServer } from 'vite';
+
+const LOSSLESS_FORMATS = new Set(['png', 'gif', 'tiff', 'bmp']);
+
+/** Convert an image buffer to WebP, using lossless for lossless source formats. */
+async function toWebp(data: Buffer): Promise<Buffer> {
+  const { format } = await sharp(data).metadata();
+  const lossless = LOSSLESS_FORMATS.has(format ?? '');
+  return sharp(data).webp(lossless ? { lossless: true } : { quality: 95 }).toBuffer();
+}
 
 const CATEGORIES = ['college', 'personal', 'career'] as const;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -127,19 +137,28 @@ function extractImagePaths(markdown: string): Set<string> {
   return paths;
 }
 
-/** Delete image files that were removed from the description. */
-function cleanupOrphanedImages(
-  oldDescription: string | undefined,
-  newDescription: string | undefined,
+/**
+ * Delete any asset files in the project's asset directory that are not
+ * referenced by the thumbnail or description.  This catches images that were
+ * removed from the description *and* images that were uploaded but never
+ * inserted into a saved description.
+ */
+function cleanupOrphanedAssets(
+  category: string,
+  slug: string,
+  thumbnail: string | undefined,
+  description: string | undefined,
 ): void {
-  const oldPaths = extractImagePaths(oldDescription ?? '');
-  const newPaths = extractImagePaths(newDescription ?? '');
-  for (const p of oldPaths) {
-    if (!newPaths.has(p)) {
-      const absPath = path.join(REPO_ROOT, p);
-      if (fs.existsSync(absPath)) {
-        fs.unlinkSync(absPath);
-      }
+  const assetDir = path.join(ASSETS_DIR, 'projects', category, slug);
+  if (!fs.existsSync(assetDir)) return;
+
+  const referenced = extractImagePaths(description ?? '');
+  if (thumbnail) referenced.add(thumbnail.replace(/^\//, ''));
+
+  for (const file of fs.readdirSync(assetDir)) {
+    const rel = `assets/projects/${category}/${slug}/${file}`;
+    if (!referenced.has(rel)) {
+      fs.unlinkSync(path.join(assetDir, file));
     }
   }
 }
@@ -229,16 +248,17 @@ export default function editorApiPlugin(): Plugin {
             return sendError(res, 400, 'No file uploaded');
           }
 
-          const ext = path.extname(upload.file.name).toLowerCase();
           const assetDir = path.join(ASSETS_DIR, 'projects', category, slug);
           fs.mkdirSync(assetDir, { recursive: true });
+
+          const webpData = await toWebp(upload.file.data);
 
           let filename: string;
           if (type === 'thumbnail') {
             // Remove any existing thumbnail with a different extension
             const existing = fs.readdirSync(assetDir).filter((f) => f.startsWith('thumbnail.'));
             for (const f of existing) fs.unlinkSync(path.join(assetDir, f));
-            filename = `thumbnail${ext}`;
+            filename = 'thumbnail.webp';
           } else {
             // Find next screenshot number
             const existing = fs.readdirSync(assetDir).filter((f) => f.startsWith('screenshot-'));
@@ -246,11 +266,11 @@ export default function editorApiPlugin(): Plugin {
               .map((f) => parseInt(f.match(/screenshot-(\d+)/)?.[1] ?? '0', 10))
               .filter((n) => !isNaN(n));
             const next = numbers.length > 0 ? Math.max(...numbers) + 1 : 1;
-            filename = `screenshot-${next}${ext}`;
+            filename = `screenshot-${next}.webp`;
           }
 
           const destPath = path.join(assetDir, filename);
-          fs.writeFileSync(destPath, new Uint8Array(upload.file.data));
+          fs.writeFileSync(destPath, new Uint8Array(webpData));
           const relativePath = `assets/projects/${category}/${slug}/${filename}`;
           return sendJson(res, 200, { path: relativePath });
         }
@@ -279,16 +299,8 @@ export default function editorApiPlugin(): Plugin {
             return sendError(res, 502, `Failed to download image: ${fetchRes.status}`);
           }
 
-          const ct = (fetchRes.headers.get('content-type') ?? '').split(';')[0].trim();
-          const extMap: Record<string, string> = {
-            'image/png': '.png',
-            'image/jpeg': '.jpg',
-            'image/gif': '.gif',
-            'image/webp': '.webp',
-          };
-          const ext = extMap[ct] ?? '.png';
-
           const buffer = Buffer.from(await fetchRes.arrayBuffer());
+          const webpData = await toWebp(buffer);
           const assetDir = path.join(ASSETS_DIR, 'projects', cat, s);
           fs.mkdirSync(assetDir, { recursive: true });
 
@@ -297,10 +309,10 @@ export default function editorApiPlugin(): Plugin {
             .map((f) => parseInt(f.match(/screenshot-(\d+)/)?.[1] ?? '0', 10))
             .filter((n) => !isNaN(n));
           const next = numbers.length > 0 ? Math.max(...numbers) + 1 : 1;
-          const filename = `screenshot-${next}${ext}`;
+          const filename = `screenshot-${next}.webp`;
 
           const destPath = path.join(assetDir, filename);
-          fs.writeFileSync(destPath, new Uint8Array(buffer));
+          fs.writeFileSync(destPath, new Uint8Array(webpData));
           const relativePath = `assets/projects/${cat}/${s}/${filename}`;
           return sendJson(res, 200, { path: relativePath });
         }
@@ -372,16 +384,13 @@ export default function editorApiPlugin(): Plugin {
             writeOrder(category, order);
           }
 
-          // Clean up images removed from the description.
-          // After a slug rename, oldProject still has old paths while body has new paths,
-          // but the files have already been moved — so rewrite old paths to match.
-          let oldDesc = oldProject.description as string | undefined;
-          if (newSlug !== slug && oldDesc) {
-            const oldPrefix = `assets/projects/${category}/${slug}/`;
-            const newPrefix = `assets/projects/${category}/${newSlug}/`;
-            oldDesc = oldDesc.replaceAll(oldPrefix, newPrefix);
-          }
-          cleanupOrphanedImages(oldDesc, body.description as string | undefined);
+          // Remove any asset files not referenced by the saved project data.
+          cleanupOrphanedAssets(
+            category,
+            newSlug,
+            body.thumbnail as string | undefined,
+            body.description as string | undefined,
+          );
 
           const targetPath = path.join(categoryDir, `${newSlug}.json`);
           fs.writeFileSync(targetPath, JSON.stringify(body, null, 2) + '\n');
