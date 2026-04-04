@@ -38,7 +38,7 @@ export default class App {
 
   static get width(): number { return window.innerWidth; }
   static get height(): number { return window.innerHeight; }
-  static get pixelRatio(): number { return window.devicePixelRatio; }
+  static get pixelRatio(): number { return Math.max(window.devicePixelRatio, 2); }
 
   static get lineWidth(): number { return Math.min(this.width, this.height) / 325; }
 
@@ -131,9 +131,7 @@ export default class App {
 
     this._activeCamera = this.orthoCamera;
 
-    this.effectComposer = new EffectComposer(this.renderer, {
-      multisampling: Math.min(4, this.renderer.capabilities.maxSamples),
-    });
+    this.effectComposer = new EffectComposer(this.renderer);
     this.renderPass = new RenderPass(this.scene, this._activeCamera);
     this.effectComposer.addPass(this.renderPass);
 
