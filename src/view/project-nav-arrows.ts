@@ -5,6 +5,8 @@ import { NeonColor } from '@/core/neon-color';
 import Text, { TextAlignX, TextAlignY } from '@/objects/text';
 
 const ARROW_SIZE = 0.45;
+const HOVER_SCALE = 1.12;
+const PRESS_SCALE = 0.88;
 
 export default class ProjectNavArrows extends Object3D {
   onPrev: (() => void) | null = null;
@@ -15,6 +17,9 @@ export default class ProjectNavArrows extends Object3D {
   private leftHitArea: Mesh;
   private rightHitArea: Mesh;
   private clickHandler: () => void;
+  private pointerDownHandler: () => void;
+  private pointerUpHandler: () => void;
+  private isPointerDown = false;
 
   constructor() {
     super();
@@ -40,6 +45,8 @@ export default class ProjectNavArrows extends Object3D {
         if (hits.length > 0) { this.onNext?.(); return; }
       }
     };
+    this.pointerDownHandler = (): void => { this.isPointerDown = true; };
+    this.pointerUpHandler = (): void => { this.isPointerDown = false; };
   }
 
   enable(showLeft: boolean, showRight: boolean): void {
@@ -47,11 +54,33 @@ export default class ProjectNavArrows extends Object3D {
     this.rightContainer.visible = showRight;
     this.visible = showLeft || showRight;
     window.addEventListener('click', this.clickHandler);
+    window.addEventListener('pointerdown', this.pointerDownHandler);
+    window.addEventListener('pointerup', this.pointerUpHandler);
   }
 
   disable(): void {
     this.visible = false;
     window.removeEventListener('click', this.clickHandler);
+    window.removeEventListener('pointerdown', this.pointerDownHandler);
+    window.removeEventListener('pointerup', this.pointerUpHandler);
+    this.isPointerDown = false;
+  }
+
+  update(): void {
+    if (!this.visible) return;
+    const arrows: [Object3D, Mesh][] = [];
+    if (this.leftContainer.visible) arrows.push([this.leftContainer, this.leftHitArea]);
+    if (this.rightContainer.visible) arrows.push([this.rightContainer, this.rightHitArea]);
+    for (const [container, hitArea] of arrows) {
+      const hovered = App.pointerActive &&
+        App.raycaster.intersectObject(hitArea).length > 0;
+      const target = hovered
+        ? (this.isPointerDown ? PRESS_SCALE : HOVER_SCALE)
+        : 1;
+      const current = container.scale.x;
+      const next = current + (target - current) * (1 - Math.exp(-15 * App.deltaTime));
+      container.scale.setScalar(next);
+    }
   }
 
   updatePosition(): void {
