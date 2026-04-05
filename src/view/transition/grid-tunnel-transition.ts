@@ -396,7 +396,7 @@ export function computeVisibleHalfHeight(): number {
 /** Compute the top-left content-area position in world coordinates at the grid plane. */
 export function computeFlyTarget(cellSize: number): Vector3 {
   const cameraWorldZ = App.cameraRig.position.z + App.perspCamera.position.z;
-  const targetZ = 0;
+  const targetZ = -0.5;
   const distance = cameraWorldZ - targetZ;
   const halfFovRad = App.perspCamera.fov * Math.PI / 360;
   const visibleHalfHeight = distance * Math.tan(halfFovRad);

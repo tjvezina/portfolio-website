@@ -501,6 +501,7 @@ export default class ViewManager extends Object3D {
           this.projectPageView.enableInput();
         }
         if (this.projectSquare) {
+          this.projectSquare.position.z = -0.5;
           this.projectSquareBaseY = this.projectSquare.position.y;
         }
       }
@@ -561,6 +562,7 @@ export default class ViewManager extends Object3D {
     if (this.projectSquare) {
       const flyTarget = this.computeFlyTargetAt(targetCameraX, grid.cellSize);
       this.projectSquare.position.copy(flyTarget);
+      this.projectSquare.position.z = -0.5;
       this.projectSquare.scale.setScalar(THUMBNAIL_SCALE);
       this.projectSquareBaseY = flyTarget.y;
     }
@@ -662,6 +664,7 @@ export default class ViewManager extends Object3D {
 
   private swapPrismToSquare(prismData: PrismData, grid: CategoryGridView): void {
     const square = new Wireframe(grid.createFaceGeometry(), { color: grid.color });
+    square.position.z = -0.5;
 
     // Transfer thumbnail to the square
     if (prismData.thumbnailMesh?.parent === prismData.wireframe) {
@@ -686,14 +689,16 @@ export default class ViewManager extends Object3D {
 
   private computeFlyTargetAt(cameraX: number, cellSize: number): Vector3 {
     const cameraWorldZ = App.cameraRig.position.z + App.perspCamera.position.z;
+    const targetZ = -0.5;
+    const distance = cameraWorldZ - targetZ;
     const halfFovRad = App.perspCamera.fov * Math.PI / 360;
-    const visibleHalfHeight = cameraWorldZ * Math.tan(halfFovRad);
+    const visibleHalfHeight = distance * Math.tan(halfFovRad);
     const contentHalfWidth = HOME_AREA_WIDTH / 2;
     const margin = cellSize * 1.1;
     return new Vector3(
       cameraX - contentHalfWidth + margin,
       App.cameraRig.position.y + visibleHalfHeight - margin,
-      0,
+      targetZ,
     );
   }
 
@@ -786,6 +791,7 @@ export default class ViewManager extends Object3D {
     const square = new Wireframe(grid.createFaceGeometry(), { color: grid.color });
     const flyTarget = computeFlyTarget(grid.cellSize);
     square.position.copy(flyTarget);
+    square.position.z = -0.5;
 
     // Transfer thumbnail from prism to square
     if (prismData.thumbnailMesh?.parent === prismData.wireframe) {
