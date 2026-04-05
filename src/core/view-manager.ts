@@ -108,6 +108,7 @@ export default class ViewManager extends Object3D {
     this.backButtonOriginalZ = this.backButton.position.z;
     this.backButton.updatePosition();
     this.backButton.onClick = (): void => {
+      if (this.projectPageView?.lightboxActive) return;
       if (this.viewingProject && this.activeCategory) {
         App.router.navigate({ type: 'category', area: this.activeCategory });
       } else {
@@ -120,6 +121,7 @@ export default class ViewManager extends Object3D {
     this.navArrows.position.z = 5;
     this.navArrows.updatePosition();
     this.navArrows.onPrev = (): void => {
+      if (this.projectPageView?.lightboxActive) return;
       if (!this.activeProjectSlug || !this.activeCategory) return;
       const projects = getCategoryData(this.activeCategory).projects;
       if (projects.length < 2) return;
@@ -128,6 +130,7 @@ export default class ViewManager extends Object3D {
       App.router.navigate({ type: 'project', area: this.activeCategory, slug: prev.slug });
     };
     this.navArrows.onNext = (): void => {
+      if (this.projectPageView?.lightboxActive) return;
       if (!this.activeProjectSlug || !this.activeCategory) return;
       const projects = getCategoryData(this.activeCategory).projects;
       if (projects.length < 2) return;
@@ -141,6 +144,12 @@ export default class ViewManager extends Object3D {
   onRouteChanged(route: Route, direction: NavigationDirection): void {
     if (this.busy) {
       this.enqueuePendingRoute(route, direction);
+      return;
+    }
+    if (this.projectPageView?.lightboxActive) {
+      this.projectPageView.closeLightbox(() => {
+        this.onRouteChanged(route, direction);
+      });
       return;
     }
     this.executeRoute(route, direction);
@@ -942,7 +951,10 @@ export default class ViewManager extends Object3D {
     this.projectPageView?.update();
     this.projectSlide?.oldPageView?.update();
 
-    this.backButton.update();
+    if (!this.projectPageView?.lightboxActive) {
+      this.backButton.update();
+      this.navArrows.update();
+    }
     this.homeView.update();
 
     // Drive cross-unfold animation on the active category grid

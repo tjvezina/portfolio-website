@@ -114,6 +114,16 @@ export default class ProjectPageView extends Object3D {
   get contentHeight(): number { return this._contentHeight; }
   get lightboxActive(): boolean { return this.lightbox !== null; }
 
+  /** Start the close animation; call `onClosed` when it finishes. */
+  closeLightbox(onClosed: () => void): void {
+    if (this.lightbox) {
+      this.lightbox.closing = true;
+      this.lightboxClosedCallback = onClosed;
+    } else {
+      onClosed();
+    }
+  }
+
   private clickTargets: ClickTarget[] = [];
   private clickHandler: () => void;
   private playButtons: PlayButton[] = [];
@@ -131,6 +141,7 @@ export default class ProjectPageView extends Object3D {
     progress: number,
     closing: boolean,
   } | null = null;
+  private lightboxClosedCallback: (() => void) | null = null;
 
   private keyHandler: ((e: KeyboardEvent) => void) | null = null;
 
@@ -389,7 +400,7 @@ export default class ProjectPageView extends Object3D {
 
     // Button hover/press
     for (const btn of this.playButtons) {
-      const hovered = App.pointerActive &&
+      const hovered = !this.lightbox && App.pointerActive &&
         App.raycaster.intersectObject(btn.hitArea).length > 0;
       const target = hovered
         ? (this.isPointerDown ? BUTTON_PRESS_SCALE : BUTTON_HOVER_SCALE)
@@ -529,6 +540,9 @@ export default class ProjectPageView extends Object3D {
     lb.overlay.geometry.dispose();
     (lb.overlay.material as Material).dispose();
     this.lightbox = null;
+    const cb = this.lightboxClosedCallback;
+    this.lightboxClosedCallback = null;
+    cb?.();
   }
 
   // ---------------------------------------------------------------------------
