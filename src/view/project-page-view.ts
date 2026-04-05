@@ -880,7 +880,13 @@ export default class ProjectPageView extends Object3D {
     );
     const rowHeight = Math.min(fillHeight, maxNativeHeight);
 
-    let cursorX = left;
+    const totalImageWidth = aspects.reduce((sum, a) => sum + rowHeight * a, 0);
+    const nativeCapped = rowHeight < fillHeight;
+    const gap = nativeCapped
+      ? (maxWidth - totalImageWidth) / (sources.length + 1)
+      : IMAGE_ROW_GAP;
+
+    let cursorX = nativeCapped ? left + gap : left;
     for (let i = 0; i < sources.length; i++) {
       const imgWidth = rowHeight * aspects[i];
       const centerX = cursorX + imgWidth / 2;
@@ -914,7 +920,7 @@ export default class ProjectPageView extends Object3D {
         mat.needsUpdate = true;
       });
 
-      cursorX += imgWidth + IMAGE_ROW_GAP;
+      cursorX += imgWidth + gap;
     }
 
     return startY - rowHeight;
