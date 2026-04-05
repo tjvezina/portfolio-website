@@ -213,6 +213,7 @@ export default class ViewManager extends Object3D {
 
   onWheel(deltaY: number): void {
     if (!this.viewingProject || !this.projectPageView || this.activeGridTunnel || this.projectSlide) return;
+    if (this.projectPageView.lightboxActive) return;
     this.projectScrollTarget += deltaY * 0.01;
     const visibleHeight = computeVisibleHalfHeight() * 2;
     const maxScroll = Math.max(0, this.projectPageView.contentHeight - visibleHeight);

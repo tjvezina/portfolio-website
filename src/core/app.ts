@@ -4,7 +4,7 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial';
 import { Font, FontLoader } from 'three/addons/loaders/FontLoader';
 import { TTFLoader } from 'three/addons/loaders/TTFLoader';
 
-import { BLOOM_LAYER } from '@/core/layers';
+import { BLOOM_LAYER, LIGHTBOX_LAYER } from '@/core/layers';
 import Router, { NavigationDirection, Route } from '@/core/router';
 import MainScene from '@/scenes/main-scene';
 import { assert } from '@/utils/debug';
@@ -243,6 +243,10 @@ export default class App {
     this._activeCamera.layers.set(BLOOM_LAYER);
     this.renderer.autoClear = false;
     this.effectComposer.render();
+
+    // Pass 3: Lightbox overlay + zoomed image (alpha-blended on top of everything)
+    this._activeCamera.layers.set(LIGHTBOX_LAYER);
+    this.renderer.render(this.scene, this._activeCamera);
     this.renderer.autoClear = true;
   }
 }

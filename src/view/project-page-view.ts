@@ -1,10 +1,10 @@
 import {
   BufferGeometry, Material, Mesh, MeshBasicMaterial, Object3D,
-  PlaneGeometry, Shape, ShapeGeometry, SRGBColorSpace, TextureLoader,
+  PlaneGeometry, Shape, ShapeGeometry, SRGBColorSpace, TextureLoader, Vector3,
 } from 'three';
 
 import App, { HOME_AREA_WIDTH } from '@/core/app';
-import { BLOOM_LAYER } from '@/core/layers';
+import { BLOOM_LAYER, LIGHTBOX_LAYER } from '@/core/layers';
 import { NeonColor } from '@/core/neon-color';
 import { ProjectData } from '@/data/types';
 import Text, { TextAlignX, TextAlignY } from '@/objects/text';
@@ -60,10 +60,28 @@ const BUTTON_GAP = 0.3;
 const BUTTON_CORNER_RADIUS = 0.12;
 const BUTTON_HOVER_SCALE = 1.06;
 const BUTTON_PRESS_SCALE = 0.94;
+const LIGHTBOX_ANIM_SPEED = 2.5;
+const LIGHTBOX_OVERLAY_OPACITY = 0.85;
+const LIGHTBOX_MARGIN_FRAC = 0.08;
 
 type PlayButton = {
   container: Object3D,
   hitArea: Mesh,
+}
+
+type ImageInfo = {
+  aspect: number,
+  naturalWidth: number,
+  naturalHeight: number,
+}
+
+type ImageEntry = {
+  mesh: Mesh,
+  bloomFill: Mesh,
+  width: number,
+  height: number,
+  naturalWidth: number,
+  naturalHeight: number,
 }
 
 function createRoundedRectShape(
@@ -87,9 +105,14 @@ function createRoundedRectShape(
   return shape;
 }
 
+function easeInOutCubic(t: number): number {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
 export default class ProjectPageView extends Object3D {
   private _contentHeight = 0;
   get contentHeight(): number { return this._contentHeight; }
+  get lightboxActive(): boolean { return this.lightbox !== null; }
 
   private clickTargets: ClickTarget[] = [];
   private clickHandler: () => void;
@@ -99,7 +122,17 @@ export default class ProjectPageView extends Object3D {
   private pointerDownHandler: () => void;
   private pointerUpHandler: () => void;
   private textureLoader = new TextureLoader();
-  private imageDims: Map<string, number>;
+  private imageDims: Map<string, ImageInfo>;
+  private imageEntries: ImageEntry[] = [];
+  private lightbox: {
+    entry: ImageEntry,
+    overlay: Mesh,
+    origPos: Vector3,
+    progress: number,
+    closing: boolean,
+  } | null = null;
+
+  private keyHandler: ((e: KeyboardEvent) => void) | null = null;
 
   /** Preload image dimensions, then construct the view with correct layout. */
   static async create(
@@ -110,7 +143,7 @@ export default class ProjectPageView extends Object3D {
     const urls = ProjectPageView.extractImageUrls(project.description ?? '');
     const dims = urls.length > 0
       ? await ProjectPageView.preloadImageDims(urls)
-      : new Map<string, number>();
+      : new Map<string, ImageInfo>();
     return new ProjectPageView(project, color, cellSize, dims);
   }
 
@@ -125,12 +158,20 @@ export default class ProjectPageView extends Object3D {
     return urls;
   }
 
-  private static preloadImageDims(urls: string[]): Promise<Map<string, number>> {
+  private static preloadImageDims(urls: string[]): Promise<Map<string, ImageInfo>> {
     return Promise.all(urls.map(url =>
-      new Promise<[string, number]>((resolve) => {
+      new Promise<[string, ImageInfo]>((resolve) => {
         const img = new Image();
-        img.onload = (): void => resolve([url, img.naturalWidth / img.naturalHeight]);
-        img.onerror = (): void => resolve([url, IMAGE_ASPECT]);
+        img.onload = (): void => resolve([url, {
+          aspect: img.naturalWidth / img.naturalHeight,
+          naturalWidth: img.naturalWidth,
+          naturalHeight: img.naturalHeight,
+        }]);
+        img.onerror = (): void => resolve([url, {
+          aspect: IMAGE_ASPECT,
+          naturalWidth: Infinity,
+          naturalHeight: Infinity,
+        }]);
         img.src = url;
       }),
     )).then(entries => new Map(entries));
@@ -140,7 +181,7 @@ export default class ProjectPageView extends Object3D {
     project: ProjectData,
     color: NeonColor,
     cellSize: number,
-    imageDims: Map<string, number>,
+    imageDims: Map<string, ImageInfo>,
   ) {
     super();
     this.imageDims = imageDims;
@@ -265,11 +306,25 @@ export default class ProjectPageView extends Object3D {
 
     this._contentHeight = Math.abs(y) + 1.0;
 
-    // Click handler for play buttons and links
+    // Click handler for lightbox, play buttons, and links
     this.clickHandler = (): void => {
+      if (this.lightbox) {
+        if (!this.lightbox.closing) {
+          this.lightbox.closing = true;
+        }
+        return;
+      }
+
+      for (const entry of this.imageEntries) {
+        if ((entry.mesh.material as MeshBasicMaterial).opacity === 0) continue;
+        if (App.raycaster.intersectObject(entry.mesh).length > 0) {
+          this.openLightbox(entry);
+          return;
+        }
+      }
+
       for (const target of this.clickTargets) {
-        const intersects = App.raycaster.intersectObject(target.mesh);
-        if (intersects.length > 0) {
+        if (App.raycaster.intersectObject(target.mesh).length > 0) {
           window.open(target.url, '_blank');
           return;
         }
@@ -283,13 +338,24 @@ export default class ProjectPageView extends Object3D {
     window.addEventListener('click', this.clickHandler);
     window.addEventListener('pointerdown', this.pointerDownHandler);
     window.addEventListener('pointerup', this.pointerUpHandler);
+    this.keyHandler = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape' && this.lightbox && !this.lightbox.closing) {
+        this.lightbox.closing = true;
+      }
+    };
+    window.addEventListener('keydown', this.keyHandler);
   }
 
   disableInput(): void {
     window.removeEventListener('click', this.clickHandler);
     window.removeEventListener('pointerdown', this.pointerDownHandler);
     window.removeEventListener('pointerup', this.pointerUpHandler);
+    if (this.keyHandler) {
+      window.removeEventListener('keydown', this.keyHandler);
+      this.keyHandler = null;
+    }
     this.isPointerDown = false;
+    if (this.lightbox) this.tearDownLightbox();
   }
 
   update(): void {
@@ -332,6 +398,40 @@ export default class ProjectPageView extends Object3D {
       const next = current + (target - current) *
         (1 - Math.exp(-15 * App.deltaTime));
       btn.container.scale.setScalar(next);
+    }
+
+    // Lightbox animation
+    if (this.lightbox) {
+      const lb = this.lightbox;
+      lb.progress += (lb.closing ? -LIGHTBOX_ANIM_SPEED : LIGHTBOX_ANIM_SPEED) * App.deltaTime;
+      lb.progress = Math.max(0, Math.min(1, lb.progress));
+
+      const t = easeInOutCubic(lb.progress);
+
+      const cam = App.camera;
+      const visW = cam.right - cam.left;
+      const visH = cam.top - cam.bottom;
+      const maxW = visW * (1 - LIGHTBOX_MARGIN_FRAC * 2);
+      const maxH = visH * (1 - LIGHTBOX_MARGIN_FRAC * 2);
+      const worldPerPixel = visW / App.width;
+      const nativeScale = 2 * lb.entry.naturalWidth * worldPerPixel / lb.entry.width;
+      const targetScale = Math.min(nativeScale, maxW / lb.entry.width, maxH / lb.entry.height);
+
+      const centerX = App.cameraRig.position.x - this.position.x;
+      const centerY = App.cameraRig.position.y - this.position.y;
+
+      const px = lb.origPos.x + (centerX - lb.origPos.x) * t;
+      const py = lb.origPos.y + (centerY - lb.origPos.y) * t;
+      lb.entry.mesh.position.set(px, py, lb.origPos.z);
+
+      lb.entry.mesh.scale.setScalar(1 + (targetScale - 1) * t);
+
+      (lb.overlay.material as MeshBasicMaterial).opacity = t * LIGHTBOX_OVERLAY_OPACITY;
+      lb.overlay.position.set(centerX, centerY, 0);
+
+      if (lb.closing && lb.progress <= 0) {
+        this.tearDownLightbox();
+      }
     }
   }
 
@@ -383,6 +483,52 @@ export default class ProjectPageView extends Object3D {
     btn.add(hitArea);
 
     return { button: btn, width, hitArea };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Lightbox
+  // ---------------------------------------------------------------------------
+
+  private openLightbox(entry: ImageEntry): void {
+    const overlay = new Mesh(
+      new PlaneGeometry(200, 200),
+      new MeshBasicMaterial({
+        color: 0x000000,
+        transparent: true,
+        opacity: 0,
+        depthTest: false,
+        depthWrite: false,
+      }),
+    );
+    overlay.layers.set(LIGHTBOX_LAYER);
+    this.add(overlay);
+
+    // Move image to the lightbox layer so it renders after clean + bloom passes
+    entry.mesh.layers.set(LIGHTBOX_LAYER);
+    entry.mesh.renderOrder = 1;
+    (entry.mesh.material as MeshBasicMaterial).depthTest = false;
+
+    this.lightbox = {
+      entry,
+      overlay,
+      origPos: entry.mesh.position.clone(),
+      progress: 0,
+      closing: false,
+    };
+  }
+
+  private tearDownLightbox(): void {
+    if (!this.lightbox) return;
+    const lb = this.lightbox;
+    lb.entry.mesh.position.copy(lb.origPos);
+    lb.entry.mesh.scale.setScalar(1);
+    lb.entry.mesh.layers.set(0);
+    lb.entry.mesh.renderOrder = 0;
+    (lb.entry.mesh.material as MeshBasicMaterial).depthTest = true;
+    this.remove(lb.overlay);
+    lb.overlay.geometry.dispose();
+    (lb.overlay.material as Material).dispose();
+    this.lightbox = null;
   }
 
   // ---------------------------------------------------------------------------
@@ -664,8 +810,11 @@ export default class ProjectPageView extends Object3D {
     startY: number,
     maxWidth: number,
   ): number {
-    const aspect = this.imageDims.get(src) ?? IMAGE_ASPECT;
-    const imageWidth = maxWidth;
+    const info = this.imageDims.get(src);
+    const aspect = info?.aspect ?? IMAGE_ASPECT;
+    const worldPerPixel = (App.camera.right - App.camera.left) / App.width;
+    const nativeWorldWidth = info ? info.naturalWidth * worldPerPixel : Infinity;
+    const imageWidth = Math.min(maxWidth, nativeWorldWidth);
     const imageHeight = imageWidth / aspect;
     const centerX = left + maxWidth / 2;
 
@@ -681,6 +830,15 @@ export default class ProjectPageView extends Object3D {
     bloomFill.renderOrder = -1;
     bloomFill.position.copy(plane.position);
     this.add(bloomFill);
+
+    this.imageEntries.push({
+      mesh: plane,
+      bloomFill,
+      width: imageWidth,
+      height: imageHeight,
+      naturalWidth: info?.naturalWidth ?? Infinity,
+      naturalHeight: info?.naturalHeight ?? Infinity,
+    });
 
     this.textureLoader.load(src, (texture) => {
       texture.colorSpace = SRGBColorSpace;
@@ -698,9 +856,15 @@ export default class ProjectPageView extends Object3D {
     startY: number,
     maxWidth: number,
   ): number {
-    const aspects = sources.map(src => this.imageDims.get(src) ?? IMAGE_ASPECT);
+    const infos = sources.map(src => this.imageDims.get(src));
+    const aspects = infos.map(info => info?.aspect ?? IMAGE_ASPECT);
     const totalAspect = aspects.reduce((sum, a) => sum + a, 0);
-    const rowHeight = (maxWidth - (sources.length - 1) * IMAGE_ROW_GAP) / totalAspect;
+    const fillHeight = (maxWidth - (sources.length - 1) * IMAGE_ROW_GAP) / totalAspect;
+    const worldPerPixel = (App.camera.right - App.camera.left) / App.width;
+    const maxNativeHeight = Math.min(
+      ...infos.map(info => info ? info.naturalHeight * worldPerPixel : Infinity),
+    );
+    const rowHeight = Math.min(fillHeight, maxNativeHeight);
 
     let cursorX = left;
     for (let i = 0; i < sources.length; i++) {
@@ -718,6 +882,16 @@ export default class ProjectPageView extends Object3D {
       bloomFill.renderOrder = -1;
       bloomFill.position.copy(plane.position);
       this.add(bloomFill);
+
+      const info = infos[i];
+      this.imageEntries.push({
+        mesh: plane,
+        bloomFill,
+        width: imgWidth,
+        height: rowHeight,
+        naturalWidth: info?.naturalWidth ?? Infinity,
+        naturalHeight: info?.naturalHeight ?? Infinity,
+      });
 
       this.textureLoader.load(sources[i], (texture) => {
         texture.colorSpace = SRGBColorSpace;
